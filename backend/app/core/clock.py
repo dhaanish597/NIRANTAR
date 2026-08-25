@@ -97,3 +97,16 @@ class ScenarioClock:
         """Restart at `start`. Used when a replay is restarted (BUILD_PLAN.md task 4.7)."""
         self._current = self.start
         return self._current
+
+    def seek(self, to: datetime) -> datetime:
+        """Jump to an arbitrary timestamp within [start, end], forward OR backward.
+
+        Unlike `advance()` (which enforces "never move backward" — the right invariant for
+        ordinary frame-by-frame playback, where going backward would signal a real bug), `seek()`
+        is the deliberate escape hatch for scrubbing a replay to an arbitrary point on its
+        timeline (BUILD_PLAN.md task 4.7). Values outside [start, end] are clamped rather than
+        raising, so a caller scrubbing slightly past either end of the scenario still lands
+        somewhere valid instead of crashing the replay.
+        """
+        self._current = max(self.start, min(to, self.end))
+        return self._current

@@ -7,7 +7,9 @@ interpolated, or otherwise invented (CLAUDE.md rule 13, determinism).
 from __future__ import annotations
 
 import asyncio
+import bisect
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -95,6 +97,15 @@ def _merged_cell_observation(
     )
 
 
+def _nearest_frame_index(frames: list, to: datetime) -> int:
+    """Index of the first frame at-or-after `to` (bisect on the sorted frame timestamps
+    `scripts/validate_scenario.py` already requires); clamped to the last frame if `to` is past
+    the scenario's final frame."""
+    times = [f.t for f in frames]
+    index = bisect.bisect_left(times, to)
+    return min(index, len(frames) - 1)
+
+
 class ScenarioSource:
     """DataSource implementation that replays a ScenarioFile on a ScenarioClock.
 
@@ -102,6 +113,26 @@ class ScenarioSource:
     watching this animate sees it unfold the way a judge would. `realtime=False` advances the
     clock and yields as fast as possible — used by tests and the determinism check (BUILD_PLAN.md
     task 4.11), where wall-clock pacing would only slow things down without proving anything.
+
+    Replay controls (BUILD_PLAN.md task 4.7 — pause / resume / speed / scrub to timestamp /
+    restart), all safe to call from another task/coroutine while `frames()` is actively iterating:
+
+    - `pause()` / `resume()`: `frames()` blocks (via an `asyncio.Event`) before yielding the next
+      frame while paused, without ending iteration — the caller's `async for` just stalls, ready
+      to continue the instant `resume()` is called.
+    - `set_speed(x)`: mutates `self.clock.speed_factor` directly. `frames()` re-reads
+      `clock.speed_factor` fresh on every iteration (not once at construction), so a change takes
+      effect on the very next frame's pacing — no restart needed.
+    - `seek(to)`: schedules a jump to the frame at-or-after `to`. Consumed by `frames()` just
+      before it processes the next frame (so a seek issued mid-iteration takes effect on the very
+      next step, forward OR backward), via `clock.seek()` (not `advance()`, which forbids moving
+      backward — the right guard for ordinary playback, but wrong for scrubbing).
+    - `restart()`: resets the clock to `start` (`ScenarioClock.reset()`), the frame pointer to 0,
+      clears any pending seek, and un-pauses. Fully resets THIS object's iteration state so a
+      fresh call to `frames()` replays from the very beginning with no residue from the previous
+      run — proven byte-identical to a from-scratch `ScenarioSource` in
+      `tests/test_ingest_replay.py`. Resetting *downstream* state (the `Pipeline`'s audit hash
+      chain) is the caller's job — see `api/state.py`'s `AppState`, which owns the `Pipeline`.
     """
 
     def __init__(self, scenario: ScenarioFile, clock: ScenarioClock, *, realtime: bool = True):
@@ -109,15 +140,65 @@ class ScenarioSource:
         self.clock = clock
         self.realtime = realtime
         self._provenance = _frame_provenance(scenario)
+        self._frame_index = 0
+        self._seek_index: int | None = None
+        self._paused = asyncio.Event()
+        self._paused.set()  # not paused by default
+
+    @property
+    def paused(self) -> bool:
+        return not self._paused.is_set()
+
+    def pause(self) -> None:
+        self._paused.clear()
+
+    def resume(self) -> None:
+        self._paused.set()
+
+    def set_speed(self, speed_factor: float) -> None:
+        if speed_factor <= 0:
+            raise ValueError(f"speed_factor must be > 0, got {speed_factor}")
+        self.clock.speed_factor = speed_factor
+
+    def seek(self, to: datetime) -> None:
+        """Scrub to the frame at-or-after `to`. Takes effect the next time `frames()` checks for
+        a pending seek, i.e. just before it yields its next frame — safe to call concurrently
+        while `frames()` is iterating in another task, unlike mutating `_frame_index` directly."""
+        self._seek_index = _nearest_frame_index(self.scenario.frames, to)
+
+    def restart(self) -> None:
+        """Reset to the very beginning — see the class docstring's `restart()` note."""
+        self.clock.reset()
+        self._frame_index = 0
+        self._seek_index = None
+        self._paused.set()
 
     async def frames(self) -> AsyncIterator[ObservationFrame]:
-        for frame in self.scenario.frames:
+        self._frame_index = 0
+        while self._frame_index < len(self.scenario.frames):
+            await self._paused.wait()
+
+            jumped = False
+            if self._seek_index is not None:
+                self._frame_index = self._seek_index
+                self._seek_index = None
+                jumped = True
+
+            frame = self.scenario.frames[self._frame_index]
+
             if self.realtime:
                 real_seconds = (frame.t - self.clock.now()).total_seconds() / self.clock.speed_factor
                 if real_seconds > 0:
                     await asyncio.sleep(real_seconds)
 
-            self.clock.advance(to=frame.t)
+            # seek() can jump the clock backward (scrubbing to an earlier point) — advance()
+            # forbids that by design (it's the right guard for ordinary forward playback), so a
+            # frame reached via a seek uses the unconstrained seek() instead; every other frame
+            # still goes through advance()'s "never move backward" invariant.
+            if jumped:
+                self.clock.seek(frame.t)
+            else:
+                self.clock.advance(to=frame.t)
 
             cells = [
                 _merged_cell_observation(
@@ -131,3 +212,4 @@ class ScenarioSource:
                 cells=cells,
                 provenance=self._provenance,
             )
+            self._frame_index += 1
