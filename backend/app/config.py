@@ -19,6 +19,11 @@ class AoiConfig(BaseModel):
     # (min_lon, min_lat, max_lon, max_lat) — the common GIS bbox convention (matches Shapely's
     # box() argument order).
     bbox: tuple[float, float, float, float]
+    # UTM zone EPSG code covering this AOI — terrain math (slope/aspect/curvature/flow
+    # accumulation) needs a projected, equal-distance CRS; EPSG:4326 degrees are not uniform
+    # distance. Used by scripts/build_grid.py (task 1.2) and will be reused by
+    # scripts/build_road_graph.py (task 2.1).
+    utm_epsg: int
 
 
 # Aizawl's bbox is a Phase 1 engineering choice, not a cited research figure: centered on the
@@ -35,6 +40,7 @@ AOIS: dict[str, AoiConfig] = {
         center_lat=23.7307,
         center_lon=92.7173,
         bbox=(92.60, 23.60, 92.85, 23.85),
+        utm_epsg=32646,  # WGS 84 / UTM zone 46N — covers 90-96E, Aizawl (92.7E) is well inside
     ),
 }
 

@@ -10,3 +10,4 @@ shapely>=2.0,<3.0
 geopandas>=1.0,<2.0
 pyproj>=3.6,<4.0
 requests>=2.32,<3.0
+scipy>=1.14,<2.0

@@ -21,6 +21,18 @@ Check items off as you do them; delete the file (or the section) once it's empty
       through in time, the plan already has a fallback (`source: "coarse_fallback"`, labelled
       honestly rather than presented as high-resolution) — so this is worth attempting but isn't
       a hard blocker.
+- [ ] **NASA COOLR / Global Landslide Catalog access (task 1.12)** — correcting something I got
+      wrong earlier: I told you this was public/no-auth. It isn't confirmed to be. Its ArcGIS
+      services live under `gis.earthdata.nasa.gov` and every endpoint I tried (several layer-name
+      variants) returned a 503 "couldn't access this resource" or a 499 "Token Required" — the
+      same domain family as the Earthdata login already needed for IMERG/SMAP above, so this is
+      likely the *same* credential, not a separate one, though I haven't confirmed that with an
+      actual authenticated request. I did not write `ml/build_inventory.py` against a guessed,
+      unverified endpoint — once you have Earthdata access, try an authenticated request against
+      `https://gis.earthdata.nasa.gov/gis05/rest/services/Landslides/COOLR_Events_Points/FeatureServer/0/query`
+      and let me know what comes back (or if there's a more direct CSV export link on
+      https://landslides.nasa.gov/viewer once logged in — I couldn't reach that page's actual
+      content to check).
 
 ## Verify before Phase 1 needs it
 

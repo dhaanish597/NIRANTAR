@@ -246,8 +246,8 @@ make freeze                 # tag a known-good demo build
 
 > **Update this section every session. Keep it short and true.**
 
-- **Phase:** 1 — started (tasks 1.1 and 1.11 done and verified; the rest of 1A/1B/1C not started).
-  Phase 0 is complete (all 16 tasks done and verified).
+- **Phase:** 1 — in progress. Tasks 1.1, 1.2, and 1.11 done and verified against real output (not
+  just "ran without error"). Phase 0 is complete (all 16 tasks done and verified).
 - **Working end-to-end?** Yes, with entirely fabricated numbers, per Phase 0's DoD. Verified live
   in a real browser (not just tests): click **Run Case Study** → pick `_smoke` → mode banner
   flips to REPLAY, the 3×3 cell block escalates Green→Yellow→Orange→Red on the MapLibre map, the
@@ -266,9 +266,12 @@ make freeze                 # tag a known-good demo build
   `risk/thresholds.py` (the real I-D/E-D threshold engine, task 1.11) exists and is tested but is
   **not wired into the pipeline yet** — that's task 1.17/1.19, once `risk/model.py` also exists,
   so both halves of the fusion rule are available at once.
-- **Static data:** `data/static/aizawl/dem.tif` exists — real Copernicus DEM GLO-30, clipped to
-  the AOI bbox, correct nodata handling (see session log). Nothing else in `data/static/` yet
-  (no grid, no exposure, no lithology).
+- **Static data:** `data/static/aizawl/dem.tif` (real Copernicus DEM GLO-30) and
+  `data/static/aizawl/cells.gpkg` (2,912-cell 500m grid: elevation, slope, aspect, relief, TWI,
+  distance-to-road, land-cover) both exist, both real, both sanity-checked against actual values
+  (not just "no exception raised") — see session log. `cells.gpkg` has four intentionally-null
+  columns (see task 1.2's note in BUILD_PLAN.md): `plan_curvature`, `profile_curvature`,
+  `dist_to_fault_km`, `lithology_class`. No exposure data yet (task 1.3).
 - **Scenarios ready:** `_smoke` only (fabricated, 10 frames, `data/scenarios/_smoke.json`). No
   real-event scenarios yet — those are Phase 4.
 - **Known gaps / deliberate deferrals (not blockers, but worth knowing about):**
@@ -280,24 +283,29 @@ make freeze                 # tag a known-good demo build
     deliberate choice so CLAUDE.md rule 10 ("demo runs with the network cable unplugged") holds
     from Phase 0 on rather than being deferred to Phase 5's PMTiles work (task 5.2). Phase 5 adds
     a real offline basemap *underneath* the existing layer, it doesn't replace this setup.
-  - Cell geometry in the live pipeline is still **synthetic** (`frontend/src/lib/grid.ts` derives
-    a 3×3 square layout from the `cell_id` naming convention) — `data/static/aizawl/dem.tif` now
-    exists but nothing consumes it yet. `scripts/build_grid.py` (task 1.2, next) is what turns
-    real DEM pixels into real cell geometry; `grid.ts` gets deleted once that lands.
+  - Cell geometry in the **live pipeline is still synthetic** (`frontend/src/lib/grid.ts`'s 3×3
+    square layout) even though real cell geometry now exists in `data/static/aizawl/cells.gpkg`.
+    Nothing has wired the real grid into `ingest`/`risk`/the API yet — that's a Phase 1C/2 task
+    (real cell_ids need to replace the `aizawl_{row}{col}` stub convention everywhere: stub_source,
+    _smoke.json, grid.ts). Don't assume this is done just because the grid file exists.
   - `ingest/factory.py` (new, not in the original file list) is the one place outside `core/`
     that branches on mode — consistent with CLAUDE.md §2 naming `ingest/` as an allowed
     mode-aware location, but flagging the addition since it wasn't literally named before.
   - `backend/app/config.py` now exists (Phase 1 needed it for AOI bounding boxes — see session
     log). `api/routes.py`'s `/api/aoi/{id}` now reads from it instead of its own duplicate dict.
-- **External access still needed** (see `Required_by_me.md` — Docker Desktop confirmed not
-  running, NASA Earthdata / IMD API access not yet requested): tasks 1.3/1.5/1.6/1.7/1.8 are
-  blocked on these, not on anything I can do myself. Tasks 1.1 (done), 1.2, 1.4 (fallback path),
-  1.11 (done), 1.12 are not blocked by any of them.
+- **External access still needed** (see `Required_by_me.md`): Docker Desktop confirmed not
+  running (blocks 1.5); NASA Earthdata not yet requested (blocks 1.6, 1.7, and — corrected this
+  session — very likely 1.12 too, not the "public, no auth" I said earlier); IMD API access not
+  yet requested (blocks 1.8). GSI Bhukosh not yet requested (blocks 1.4's precise path, though
+  1.4 has a documented coarse fallback that doesn't need it). Tasks 1.1, 1.2, 1.11 (all done)
+  were not blocked by any of this.
 - **Known blockers:** none for the tasks I picked up this session. See `Required_by_me.md` for
   what blocks the rest of Phase 1.
-- **Next action:** `scripts/build_grid.py` (task 1.2) is the natural next step — the DEM is ready
-  for it. `ml/build_inventory.py` (task 1.12, NASA COOLR is public, no auth) is also unblocked
-  and could run in parallel.
+- **Next action:** task 1.3 (`scripts/fetch_exposure.py` — villages/shelters/bridges/hospitals)
+  is mostly OSM + WorldPop + Census 2011, likely unblocked, and is the natural next static-data
+  task. Task 1.4's coarse-fallback path is also unblocked if GSI access hasn't come through.
+  1.12 needs the Earthdata-access question resolved first (see `Required_by_me.md`) before
+  attempting it for real.
 
 ---
 
@@ -318,7 +326,17 @@ make freeze                 # tag a known-good demo build
   written. Committed Phase 0 (`288967f`), `Required_by_me.md` (`f84319a`). Checked what's
   genuinely blocked before starting Phase 1: Docker Desktop's engine isn't running (confirmed,
   not assumed) and NASA Earthdata/IMD access hasn't been requested yet — both recorded in
-  `Required_by_me.md` rather than worked around.
+  `Required_by_me.md` rather than worked around. Then `scripts/build_grid.py` (task 1.2): DEM
+  reprojected to UTM 46N, slope/aspect (Horn's method, sign convention hand-derived and
+  verified), D8 flow accumulation + TWI, a 500m grid (2,912 cells), distance-to-road (OSM
+  Overpass), land-cover majority (ESA WorldCover) — all run against the real Aizawl AOI and
+  sanity-checked (elevation/slope/land-cover distribution all geomorphologically plausible for
+  Mizoram, not just "no exception"). Explicitly cut plan/profile curvature, distance-to-fault,
+  and lithology_class rather than fabricate or silently skip them — written as null columns,
+  flagged in the script docstring and BUILD_PLAN.md. Investigated task 1.12 (NASA COOLR): my
+  earlier claim that it's public/no-auth was wrong — its ArcGIS services live under
+  `gis.earthdata.nasa.gov` and return 503/499 errors consistent with needing the same Earthdata
+  login as IMERG/SMAP. Corrected in `Required_by_me.md` rather than left standing.
 - **Broke / discovered:**
   1. Caught (via the determinism test) that the audit event's `event_id` used `uuid.uuid4()` —
      unseeded randomness, violates rule 13. Fixed to a deterministic id.
@@ -337,6 +355,10 @@ make freeze                 # tag a known-good demo build
      value — caught by actually inspecting the fetched DEM's min/max instead of trusting "no
      exception raised", since Aizawl has no business having a real 0.0 m elevation pixel. Fixed
      by passing an explicit `nodata=-9999.0` sentinel and setting it on the output file's metadata.
-- **Next:** `scripts/build_grid.py` (task 1.2) — the DEM is ready for it. `ml/build_inventory.py`
-  (task 1.12) is also unblocked (NASA COOLR is public). Read `Required_by_me.md` for what's
-  blocking the rest of 1A/1B before assuming those tasks can proceed the same way.
+  6. OSM Overpass rejected `requests`' default User-Agent with a flat 406 (curl worked fine on
+     the identical query) — Overpass's usage policy wants a descriptive client identifier. Fixed
+     by setting an explicit `User-Agent` header.
+- **Next:** task 1.3 (`scripts/fetch_exposure.py`) is the natural next static-data task and looks
+  unblocked (OSM + WorldPop + Census 2011). Read `Required_by_me.md` first — it now also covers
+  the 1.12/Earthdata correction — before assuming any task proceeds the same easy way 1.1/1.2/1.11
+  did.
