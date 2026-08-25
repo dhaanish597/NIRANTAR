@@ -34,5 +34,9 @@ export default defineConfig({
     // 0 tests ever run) — threads work fine since they stay in-process. Harmless outside the
     // sandbox too, just a different concurrency model for the same tests.
     pool: 'threads',
+    // Observed one flaky timeout under the full suite's thread-pool contention in this sandbox
+    // (a component test that completes in <1s in isolation hit the 5s default) — headroom, not a
+    // fix for a real slow test.
+    testTimeout: 15000,
   },
 })
