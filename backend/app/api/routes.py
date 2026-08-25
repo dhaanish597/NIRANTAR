@@ -6,22 +6,11 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from app.config import AOIS
 from app.ingest.factory import SCENARIOS_DIR, UnknownScenarioError, load_scenario_or_raise
 from app.schemas.mode import ModeState
 
 router = APIRouter(prefix="/api")
-
-# Phase 0 stub AOI registry. Coordinates are Aizawl's public city-center lat/lon — not a claimed
-# analysis-grid boundary. Real AOI boundaries come from scripts/build_grid.py (BUILD_PLAN.md
-# task 1.2) in Phase 1.
-_STUB_AOIS: dict[str, dict] = {
-    "aizawl": {
-        "id": "aizawl",
-        "name": "Aizawl, Mizoram",
-        "center": {"lat": 23.7307, "lon": 92.7173},
-        "note": "Phase 0 stub — approximate city center, not a real analysis-grid boundary.",
-    }
-}
 
 
 def _app_state(request: Request):
@@ -35,10 +24,15 @@ async def get_state(request: Request) -> ModeState:
 
 @router.get("/aoi/{aoi_id}")
 async def get_aoi(aoi_id: str) -> dict:
-    aoi = _STUB_AOIS.get(aoi_id)
+    aoi = AOIS.get(aoi_id)
     if aoi is None:
         raise HTTPException(status_code=404, detail=f"unknown AOI {aoi_id!r}")
-    return aoi
+    return {
+        "id": aoi.id,
+        "name": aoi.name,
+        "center": {"lat": aoi.center_lat, "lon": aoi.center_lon},
+        "bbox": list(aoi.bbox),
+    }
 
 
 @router.get("/scenarios")

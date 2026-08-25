@@ -1,0 +1,12 @@
+# Phase 1+ geospatial stack (CLAUDE.md §6). Separate from requirements.txt so Phase 0's fast,
+# dependency-light environment isn't disturbed for people only touching the stub pipeline/API.
+# networkx/osmnx are NOT here yet — they're Phase 2's road-graph work (task 2.1); add them when
+# that task starts rather than installing dependencies before anything uses them.
+
+-r requirements.txt
+
+rasterio>=1.3,<2.0
+shapely>=2.0,<3.0
+geopandas>=1.0,<2.0
+pyproj>=3.6,<4.0
+requests>=2.32,<3.0

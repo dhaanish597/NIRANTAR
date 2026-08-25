@@ -246,7 +246,8 @@ make freeze                 # tag a known-good demo build
 
 > **Update this section every session. Keep it short and true.**
 
-- **Phase:** 0 — complete (all 16 tasks done and verified). Ready to start Phase 1.
+- **Phase:** 1 — started (tasks 1.1 and 1.11 done and verified; the rest of 1A/1B/1C not started).
+  Phase 0 is complete (all 16 tasks done and verified).
 - **Working end-to-end?** Yes, with entirely fabricated numbers, per Phase 0's DoD. Verified live
   in a real browser (not just tests): click **Run Case Study** → pick `_smoke` → mode banner
   flips to REPLAY, the 3×3 cell block escalates Green→Yellow→Orange→Red on the MapLibre map, the
@@ -261,8 +262,13 @@ make freeze                 # tag a known-good demo build
   MapLibre GL v6 + Zustand. `ModeBanner`, `MapView` (self-contained style, no external tile
   requests — see note below), `RightRail`, `ScenarioPickerModal`. 11 frontend tests passing
   (`frontend/src/**/*.test.ts(x)`).
-- **Risk model:** not trained — Phase 0's `risk/stub.py` is a fabricated linear function of
-  `rain_1h`, clearly labelled as a stub. Real model is Phase 1C.
+- **Risk model:** not trained — Phase 0's `risk/stub.py` is still what the live pipeline uses.
+  `risk/thresholds.py` (the real I-D/E-D threshold engine, task 1.11) exists and is tested but is
+  **not wired into the pipeline yet** — that's task 1.17/1.19, once `risk/model.py` also exists,
+  so both halves of the fusion rule are available at once.
+- **Static data:** `data/static/aizawl/dem.tif` exists — real Copernicus DEM GLO-30, clipped to
+  the AOI bbox, correct nodata handling (see session log). Nothing else in `data/static/` yet
+  (no grid, no exposure, no lithology).
 - **Scenarios ready:** `_smoke` only (fabricated, 10 frames, `data/scenarios/_smoke.json`). No
   real-event scenarios yet — those are Phase 4.
 - **Known gaps / deliberate deferrals (not blockers, but worth knowing about):**
@@ -274,19 +280,24 @@ make freeze                 # tag a known-good demo build
     deliberate choice so CLAUDE.md rule 10 ("demo runs with the network cable unplugged") holds
     from Phase 0 on rather than being deferred to Phase 5's PMTiles work (task 5.2). Phase 5 adds
     a real offline basemap *underneath* the existing layer, it doesn't replace this setup.
-  - Cell geometry in Phase 0 is **synthetic** (`frontend/src/lib/grid.ts` derives a 3×3 square
-    layout from the `cell_id` naming convention, centered on a stub AOI coordinate) — not real
-    terrain data. Phase 1's `scripts/build_grid.py` replaces this; `grid.ts` gets deleted then.
-  - `backend/app/config.py` (mentioned in CLAUDE.md §5/§4 for tunable constants) does not exist
-    yet — Phase 0's stub thresholds are fabricated throwaway numbers local to their stub modules,
-    not the real tunable formula constants. Introducing config.py now would just be clutter to
-    clean up when Phase 1–3 land the real formulas.
+  - Cell geometry in the live pipeline is still **synthetic** (`frontend/src/lib/grid.ts` derives
+    a 3×3 square layout from the `cell_id` naming convention) — `data/static/aizawl/dem.tif` now
+    exists but nothing consumes it yet. `scripts/build_grid.py` (task 1.2, next) is what turns
+    real DEM pixels into real cell geometry; `grid.ts` gets deleted once that lands.
   - `ingest/factory.py` (new, not in the original file list) is the one place outside `core/`
     that branches on mode — consistent with CLAUDE.md §2 naming `ingest/` as an allowed
     mode-aware location, but flagging the addition since it wasn't literally named before.
-- **Known blockers:** none.
-- **Next action:** Phase 1 (`docs/BUILD_PLAN.md` §Phase 1) — start with 1A static data
-  (`scripts/fetch_dem.py`), or 1B dynamic adapters, per whichever the team prioritizes first.
+  - `backend/app/config.py` now exists (Phase 1 needed it for AOI bounding boxes — see session
+    log). `api/routes.py`'s `/api/aoi/{id}` now reads from it instead of its own duplicate dict.
+- **External access still needed** (see `Required_by_me.md` — Docker Desktop confirmed not
+  running, NASA Earthdata / IMD API access not yet requested): tasks 1.3/1.5/1.6/1.7/1.8 are
+  blocked on these, not on anything I can do myself. Tasks 1.1 (done), 1.2, 1.4 (fallback path),
+  1.11 (done), 1.12 are not blocked by any of them.
+- **Known blockers:** none for the tasks I picked up this session. See `Required_by_me.md` for
+  what blocks the rest of Phase 1.
+- **Next action:** `scripts/build_grid.py` (task 1.2) is the natural next step — the DEM is ready
+  for it. `ml/build_inventory.py` (task 1.12, NASA COOLR is public, no auth) is also unblocked
+  and could run in parallel.
 
 ---
 
@@ -300,6 +311,14 @@ make freeze                 # tag a known-good demo build
   schema, `Clock`/`ModeMachine`/`Bus`, ingest (live stub + scenario replay), the stub pipeline,
   the real hash-chained audit log, FastAPI + `/ws/ticks`, and the full frontend (MapLibre, mode
   banner, right rail, scenario picker). Verified live in a browser end to end, not just in tests.
+  Then started Phase 1: `backend/app/config.py` (AOI registry, replaces `api/routes.py`'s
+  duplicate dict), `risk/thresholds.py` (task 1.11, the real I-D/E-D curves, tested — not yet
+  wired into the pipeline), and `scripts/fetch_dem.py` (task 1.1, Copernicus DEM GLO-30 via
+  the public no-auth AWS Open Data bucket) — actually run against the real Aizawl AOI, not just
+  written. Committed Phase 0 (`288967f`), `Required_by_me.md` (`f84319a`). Checked what's
+  genuinely blocked before starting Phase 1: Docker Desktop's engine isn't running (confirmed,
+  not assumed) and NASA Earthdata/IMD access hasn't been requested yet — both recorded in
+  `Required_by_me.md` rather than worked around.
 - **Broke / discovered:**
   1. Caught (via the determinism test) that the audit event's `event_id` used `uuid.uuid4()` —
      unseeded randomness, violates rule 13. Fixed to a deterministic id.
@@ -314,6 +333,10 @@ make freeze                 # tag a known-good demo build
   4. The Makefile's `python`/`uvicorn` calls resolved to an unrelated global Python install, not
      `backend/.venv` — `make test` was silently not testing what `requirements.txt` describes.
      Fixed with a `VENV_PY` variable resolved by testing which venv layout actually exists.
-- **Next:** Start Phase 1 (real data + risk engine). Read the gaps list in §11 first — especially
-  the `RunoutEnvelope`/`TickResult` gap and the synthetic-geometry note — before Phase 2 impact
-  work assumes either is already solved.
+  5. `rasterio.mask()` silently 0-fills edge pixels when the source raster declares no nodata
+     value — caught by actually inspecting the fetched DEM's min/max instead of trusting "no
+     exception raised", since Aizawl has no business having a real 0.0 m elevation pixel. Fixed
+     by passing an explicit `nodata=-9999.0` sentinel and setting it on the output file's metadata.
+- **Next:** `scripts/build_grid.py` (task 1.2) — the DEM is ready for it. `ml/build_inventory.py`
+  (task 1.12) is also unblocked (NASA COOLR is public). Read `Required_by_me.md` for what's
+  blocking the rest of 1A/1B before assuming those tasks can proceed the same way.

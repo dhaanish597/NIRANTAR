@@ -65,7 +65,7 @@ Parallelization note: if you have ≥3 people, one owns `frontend/`, one owns `b
 **Definition of Done:** for the Aizawl AOI, a real rainfall time series drives a trained XGBoost model producing per-cell `p_fail` with SHAP attributions, and the eval report in `data/models/eval_report.md` states AUC under *spatial* block cross-validation.
 
 ### 1A. Static data (Aug 26–27)
-- [ ] **1.1 (P0)** `scripts/fetch_dem.py` — Copernicus DEM 30 m (or ALOS PALSAR 12.5 m if bandwidth allows) for each AOI bounding box. Cache to `data/static/<aoi>/dem.tif`.
+- [x] **1.1 (P0)** `scripts/fetch_dem.py` — Copernicus DEM 30 m (or ALOS PALSAR 12.5 m if bandwidth allows) for each AOI bounding box. Cache to `data/static/<aoi>/dem.tif`.
 - [ ] **1.2 (P0)** `scripts/build_grid.py` — 500 m analysis grid clipped to AOI. For each cell compute: mean/max slope, aspect, plan & profile curvature, elevation, relief, TWI, distance to nearest fault/lineament, distance to nearest road, land-cover class, lithology class. Write `data/static/<aoi>/cells.gpkg`.
 - [ ] **1.3 (P0)** `scripts/fetch_exposure.py` — village points + population (Census 2011 village directory or OSM `place=village` + WorldPop raster), shelters (OSM `amenity=school|hospital|community_centre` + state DM plan lists), bridges (`man_made=bridge`), hospitals. Write `data/static/<aoi>/exposure.gpkg`.
 - [ ] **1.4 (P1)** Lithology / geology layer. If GSI Bhukosh export is not obtainable, fall back to a coarse published geological map and mark the field `source: "coarse_fallback"` in the cell record. Do not silently pretend it is high resolution.
@@ -79,7 +79,7 @@ Parallelization note: if you have ≥3 people, one owns `frontend/`, one owns `b
 - [ ] **1.10 (P0)** Every adapter must have an offline cache and a recorded fixture in `tests/fixtures/`.
 
 ### 1C. The risk engine (Aug 28–30)
-- [ ] **1.11 (P0)** `risk/thresholds.py` — implement the NE Himalaya I–D curve `I = 5.8294·D^-0.4141` and E–D curve `E = -11.10 + 0.62·D`. Output a **threshold exceedance ratio** per cell (observed / threshold), not a boolean. This is the physically-grounded baseline and the fallback if ML underperforms.
+- [x] **1.11 (P0)** `risk/thresholds.py` — implement the NE Himalaya I–D curve `I = 5.8294·D^-0.4141` and E–D curve `E = -11.10 + 0.62·D`. Output a **threshold exceedance ratio** per cell (observed / threshold), not a boolean. This is the physically-grounded baseline and the fallback if ML underperforms. *(Implemented and tested; not yet wired into the pipeline — that's task 1.17/1.19, once risk/model.py exists too.)*
 - [ ] **1.12 (P0)** Training inventory: NASA **COOLR / Global Landslide Catalog** filtered to India + NER, joined with GSI Bhukosh points if obtainable. Write `ml/build_inventory.py`. Record source counts in the eval report.
 - [ ] **1.13 (P0)** **Hold out every replay-scenario event** (Aizawl May 2024, Tupul Jun 2022, Wayanad Jul 2024, Sikkim Oct 2023) plus a spatial buffer around them. `ml/holdout.py` must assert this and fail the training run if violated. This is a P0 correctness requirement, not a nicety.
 - [ ] **1.14 (P0)** Negative sampling strategy — spatially stratified, matched on terrain, drawn from cell-days with no recorded failure. Document the choice in the eval report; a judge may ask.

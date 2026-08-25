@@ -22,13 +22,21 @@ Check items off as you do them; delete the file (or the section) once it's empty
       honestly rather than presented as high-resolution) — so this is worth attempting but isn't
       a hard blocker.
 
-## Verify before Phase 1 needs it (I didn't touch this in Phase 0)
+## Verify before Phase 1 needs it
 
-- [ ] **`make up` / Docker Desktop** — Phase 0's stub pipeline never touches PostGIS, so I never
-      actually ran `docker compose up -d postgis` this session. Phase 1 task 1.5
-      (`scripts/load_db.py`) needs it working. Run `make up` yourself once and confirm the
-      `postgis/postgis:16-3.4` image pulls and the container comes up healthy — cheaper to find
-      out now than mid-Phase-1.
+- [ ] **Start Docker Desktop.** I checked this at the start of Phase 1 (not just left untested):
+      its engine isn't running — `docker compose up -d postgis` fails with
+      `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.` Start
+      Docker Desktop, then run `docker compose up -d postgis` (see note below) and confirm the
+      `postgis/postgis:16-3.4` image pulls and the container comes up healthy. Needed before
+      Phase 1 task 1.5 (`scripts/load_db.py`) can actually load anything.
+- [ ] *(minor, workaround already noted)* `make up` itself throws a `docker` CLI arg-parsing
+      error (`unknown shorthand flag: 'd' in -d`) on this machine specifically — reproducible via
+      MSYS make's recipe shell but not when running the identical command directly in Bash. Looks
+      like a mismatch between this machine's separately-installed MSYS2 (`make.exe`) and
+      Git-for-Windows' bundled MSYS (`sh.exe`/`bash.exe`), not a project bug. Workaround: run
+      `docker compose up -d postgis` directly instead of `make up` until/unless you want to chase
+      the toolchain mismatch itself — didn't seem worth the time relative to actual Phase 1 work.
 
 ## Your call, not mine
 
