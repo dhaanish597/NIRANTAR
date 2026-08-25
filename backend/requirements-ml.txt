@@ -1,0 +1,11 @@
+# Phase 1C ML stack (BUILD_PLAN.md tasks 1.12-1.19: ml/build_inventory.py, ml/holdout.py,
+# ml/train.py, ml/evaluate.py, risk/model.py, risk/explain.py). Separate from requirements.txt/
+# requirements-geo.txt so people not touching model training don't need xgboost/shap's native
+# build. LHASA v2 (the reference architecture, CLAUDE.md §6) uses a gradient-boosted tree, hence
+# XGBoost + scikit-learn (spatial CV splitting, metrics) + SHAP (risk/explain.py, task 1.18).
+
+-r requirements-geo.txt
+
+scikit-learn>=1.5,<2.0
+xgboost>=2.1,<3.0
+shap>=0.46,<1.0
