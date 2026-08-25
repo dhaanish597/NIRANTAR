@@ -43,15 +43,16 @@ def build_scenario_clock(scenario: ScenarioFile) -> ScenarioClock:
 def _frame_provenance(scenario: ScenarioFile) -> dict[str, str]:
     """ObservationFrame.provenance is `dict[str, str]` (Appendix A) — a compact per-frame stamp.
 
-    Scenario-level provenance (Appendix B) can carry richer structure (e.g. a list of sources),
-    which wouldn't validate as dict[str, str]. We flatten just the parts worth repeating on every
-    frame; the full block belongs on a scenario-metadata endpoint, not on every single frame.
+    Scenario-level provenance (Appendix B, `schemas.scenario.ProvenanceBlock`) carries richer
+    structure (e.g. a list of sources), which wouldn't validate as dict[str, str]. We flatten just
+    the parts worth repeating on every frame; the full block belongs on a scenario-metadata
+    endpoint (`GET /api/scenarios`), not on every single frame.
     """
     raw = scenario.provenance
     return {
         "scenario_id": scenario.id,
-        "confidence": str(raw.get("confidence", "unknown")),
-        "disclaimer": str(raw.get("disclaimer", "")),
+        "confidence": raw.confidence,
+        "disclaimer": raw.disclaimer,
     }
 
 

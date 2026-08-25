@@ -30,7 +30,7 @@ def test_load_scenario_parses_the_smoke_fixture():
     assert scenario.id == "_smoke"
     assert scenario.aoi_id == "aizawl"
     assert scenario.held_out_of_training is False
-    assert scenario.provenance["confidence"] == "fabricated"
+    assert scenario.provenance.confidence == "fabricated"
     assert len(scenario.frames) == 10
 
 
@@ -103,7 +103,7 @@ def test_frame_provenance_is_flattened_to_str_str():
     assert source._provenance == {
         "scenario_id": "_smoke",
         "confidence": "fabricated",
-        "disclaimer": scenario.provenance["disclaimer"],
+        "disclaimer": scenario.provenance.disclaimer,
     }
 
 
@@ -142,7 +142,7 @@ def test_scenario_file_rejects_end_before_start():
             id="bad",
             aoi_id="aizawl",
             held_out_of_training=False,
-            provenance={"confidence": "fabricated"},
+            provenance={"confidence": "fabricated", "method": "test fixture", "disclaimer": "test"},
             clock={
                 "start": "2025-01-02T00:00:00+05:30",
                 "end": "2025-01-01T00:00:00+05:30",
@@ -159,7 +159,7 @@ def test_scenario_file_rejects_no_frames():
             id="bad",
             aoi_id="aizawl",
             held_out_of_training=False,
-            provenance={"confidence": "fabricated"},
+            provenance={"confidence": "fabricated", "method": "test fixture", "disclaimer": "test"},
             clock={
                 "start": "2025-01-01T00:00:00+05:30",
                 "end": "2025-01-01T01:00:00+05:30",
