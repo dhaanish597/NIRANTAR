@@ -246,8 +246,10 @@ make freeze                 # tag a known-good demo build
 
 > **Update this section every session. Keep it short and true.**
 
-- **Phase:** 1 — in progress. Tasks 1.1, 1.2, 1.3, 1.5, and 1.11 done and verified against real
-  output (not just "ran without error"). Phase 0 is complete (all 16 tasks done and verified).
+- **Phase:** 1 — in progress. Tasks 1.1, 1.2, 1.3, 1.5, 1.6, and 1.11 done and verified against
+  real output (not just "ran without error"). Task 1.4 deliberately deferred to run last in
+  Phase 1 (see BUILD_PLAN.md) — it blocks nothing until task 1.15. Phase 0 is complete (all 16
+  tasks done and verified).
 - **Working end-to-end?** Yes, with entirely fabricated numbers, per Phase 0's DoD. Verified live
   in a real browser (not just tests): click **Run Case Study** → pick `_smoke` → mode banner
   flips to REPLAY, the 3×3 cell block escalates Green→Yellow→Orange→Red on the MapLibre map, the
@@ -257,7 +259,8 @@ make freeze                 # tag a known-good demo build
   `schemas/` (all Appendix A models), `ingest/{base,factory}.py` + `live/stub_source.py` +
   `replay/scenario_source.py`, `pipeline.py` + stub `risk/impact/decision/dissemination`,
   `audit/` (real in-memory hash chain), `api/` (`AppState`, REST routes), `ws/hub.py`, `main.py`.
-  184 backend tests passing (`backend/tests/`).
+  `ingest/live/imerg.py` (task 1.6, real but not yet wired into `factory.py` — see below).
+  202 backend tests passing (`backend/tests/`).
 - **Frontend:** scaffolded and real for Phase 0's scope — Vite + React 19 + TS + Tailwind v4 +
   MapLibre GL v6 + Zustand. `ModeBanner`, `MapView` (self-contained style, no external tile
   requests — see note below), `RightRail`, `ScenarioPickerModal`. 11 frontend tests passing
@@ -307,18 +310,21 @@ make freeze                 # tag a known-good demo build
     mode-aware location, but flagging the addition since it wasn't literally named before.
   - `backend/app/config.py` now exists (Phase 1 needed it for AOI bounding boxes — see session
     log). `api/routes.py`'s `/api/aoi/{id}` now reads from it instead of its own duplicate dict.
-- **External access still needed** (see `Required_by_me.md`): NASA Earthdata account now exists
-  (`.env` has real credentials). IMD API access not yet requested (blocks 1.8, P1, circuit-broken
-  so not critical path). GSI Bhukosh not yet requested (blocks 1.4's precise path, though 1.4 has
-  a documented coarse fallback that doesn't need it). Docker Desktop is now running — no longer a
-  blocker for anything.
-- **Known blockers:** none for Phase 1's P0 critical path. IMD key and GSI Bhukosh are both P1
-  with documented fallbacks. See `Required_by_me.md` for the remaining open items.
-- **Next action:** task 1.4 (lithology — likely the coarse fallback, given GSI Bhukosh access is
-  still pending) or task 1.6 (`ingest/live/imerg.py` — IMERG rainfall, now unblocked by the
-  Earthdata account) are the natural next static/dynamic-data tasks. Task 1.12
-  (`ml/build_inventory.py`) can also start now that the raw COOLR CSV exists, but needs the
-  India/NER filtering + the gitignore/commit decision resolved first (see `Required_by_me.md`).
+- **External access still needed** (see `Required_by_me.md`): the Earthdata *account* exists but
+  its **GES DISC application isn't authorized yet** — a real, confirmed blocker for task 1.6's
+  live-download path (see task 1.6 note above), fixed by one click in the Earthdata profile UI,
+  likely needed again for task 1.7 (SMAP). IMD API access not yet requested (blocks 1.8, P1,
+  circuit-broken so not critical path). GSI Bhukosh (task 1.4) deliberately deprioritized — see
+  BUILD_PLAN.md, it now blocks nothing until task 1.15. Docker Desktop is running.
+- **Known blockers:** task 1.6's real-download verification is blocked on the GES DISC
+  authorization above — everything else about the adapter (URL construction, parsing logic,
+  cell-to-pixel mapping) is written and tested. Nothing else blocks Phase 1's P0 critical path.
+- **Next action:** once GES DISC is authorized, re-run
+  `python -m app.ingest.live.imerg --aoi aizawl --backfill-hours 6` (from `backend/`) to verify
+  the real HDF5 parsing against genuine bytes for the first time — fix `_read_granule_precip` if
+  the real structure differs from the documented spec it was written against. Otherwise, task 1.7
+  (`ingest/live/smap.py`) or task 1.12 (`ml/build_inventory.py`, COOLR CSV already exists) are the
+  natural next tasks not blocked by that.
 
 ---
 
@@ -340,7 +346,16 @@ make freeze                 # tag a known-good demo build
   bridges — sanity-checked against real named places, not just "ran without error"). Then task
   1.5: `scripts/load_db.py` — idempotent PostGIS loader (delete-then-insert per AOI), run for
   real against the live `postgis` container and verified via direct `psql` queries (row counts,
-  `ST_SRID`), idempotency confirmed by re-running and checking counts didn't double.
+  `ST_SRID`), idempotency confirmed by re-running and checking counts didn't double. At user's
+  request, deferred task 1.4 (GSI lithology) to run last in Phase 1 rather than in 1A — it blocks
+  nothing until task 1.15 needs `lithology_class`, documented in BUILD_PLAN.md rather than just
+  silently reordered. Then task 1.6: `ingest/live/imerg.py` — real granule URL construction
+  (confirmed against an actual GES DISC directory listing), a `requests.Session` subclass fixing
+  the cross-host Authorization-header-stripping redirect issue, HDF5 parsing against the publicly
+  documented IMERG spec (not yet verified against real bytes — see below), a persistent per-pixel
+  rolling-window rainfall cache, and cell-to-pixel mapping verified against the real Aizawl grid
+  (2,912 cells map onto just 16 unique 0.1deg IMERG pixels — confirmed the resolution-mismatch
+  claim for real, not asserted). 18 new tests using synthetic HDF5 fixtures.
 - **Broke / discovered:**
   1. The public Overpass API rate-limited `fetch_exposure.py` (HTTP 429) after just 2 queries at
      a 2s gap, then also returned transient 502/503/504s — added a retry-with-backoff wrapper
@@ -354,10 +369,21 @@ make freeze                 # tag a known-good demo build
   3. Found the user had briefly pasted real NASA Earthdata credentials into `.env.example` (a
      tracked file) instead of `.env` — caught and reverted before it was committed, no leak
      reached git history.
-- **Next:** task 1.4 (lithology, likely the coarse fallback) or task 1.6 (`ingest/live/imerg.py`,
-  now unblocked by the Earthdata account) are the natural next tasks. Task 1.12
-  (`ml/build_inventory.py`) can start now that raw COOLR data exists, but needs India/NER
-  filtering plus a decision on committing a filtered subset (`Required_by_me.md` has the detail).
+  4. Real IMERG granule downloads return NASA's generic GES DISC web-app HTML shell (HTTP 200)
+     instead of file bytes — confirmed via the Earthdata Forum that this is the account not
+     having authorized the "GES DISC" application yet (a one-time step separate from just having
+     an Earthdata login), not a code bug. Added a magic-byte check so this fails loudly with an
+     actionable message instead of silently caching garbage as a "successful" download.
+  5. Caught (via `test_no_wallclock.py`, not by luck) that `imerg.py`'s CLI entry point called
+     `datetime.now()` directly — a real rule-14 violation. Fixed to go through `LiveClock()`.
+  6. Caught (by actually running the script, not trusting the unit tests) an off-by-one in
+     `REPO_ROOT`'s `.parents[N]` index — `imerg.py` sits one directory deeper than `scripts/`'s
+     top-level modules, so the constant copied from a shallower file was wrong by one level.
+- **Next:** once the GES DISC authorization above is done, re-run `imerg.py`'s backfill against
+  real data and fix the HDF5 parsing if the real structure differs from the documented spec it
+  was written against (see the module's own docstring). Otherwise task 1.7 (`smap.py`) or task
+  1.12 (`ml/build_inventory.py`, COOLR CSV already exists) are next, and task 1.4 (lithology) is
+  now deliberately scheduled last in Phase 1, right before task 1.15.
 
 ### 2026-08-25 — Session 1
 

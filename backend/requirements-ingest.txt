@@ -1,0 +1,7 @@
+# Phase 1B live-adapter dependencies (BUILD_PLAN.md tasks 1.6-1.9: imerg.py, smap.py, imd.py,
+# insar.py). Separate from requirements.txt/requirements-geo.txt/requirements-db.txt so people
+# not touching live ingest don't need HDF5/NetCDF native libraries.
+
+-r requirements-geo.txt
+
+h5py>=3.11,<4.0
