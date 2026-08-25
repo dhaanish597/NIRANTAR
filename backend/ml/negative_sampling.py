@@ -80,6 +80,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
 from app.config import get_aoi  # noqa: E402
+from app.risk import features as _features  # noqa: E402
 from ml import holdout  # noqa: E402
 
 # Rows this coarse can't be trusted to identify a specific 500m cell (see task 1.12's recorded
@@ -104,26 +105,10 @@ NEGATIVE_TO_POSITIVE_RATIO = 3
 
 RANDOM_SEED = 42
 
-TERRAIN_FEATURE_COLUMNS = [
-    "elevation_m",
-    "elevation_min_m",
-    "elevation_max_m",
-    "slope_mean_deg",
-    "slope_max_deg",
-    "twi_mean",
-    "relief_m",
-    "aspect_mean_deg",
-    "dist_to_road_m",
-    "land_cover_class",
-    # Explicit-missing columns (task 1.2 scope cuts + task 1.4's deferral) — kept as real columns,
-    # 100% null this pass, so XGBoost's native missing-value handling can use them once they land
-    # rather than the schema changing shape later. Ruling given for lithology_class in the task
-    # brief; applied consistently to the other three null columns from the same script.
-    "plan_curvature",
-    "profile_curvature",
-    "dist_to_fault_km",
-    "lithology_class",
-]
+# The canonical list lives in app/risk/features.py (CLAUDE.md §5's "risk/ <- features, ...") so
+# ml/train.py and risk/model.py (task 1.17) both engineer features identically — re-exported here
+# under its original name since callers/tests already refer to `negative_sampling.TERRAIN_FEATURE_COLUMNS`.
+TERRAIN_FEATURE_COLUMNS = _features.TERRAIN_FEATURE_COLUMNS
 
 
 def load_eligible_cells(aoi_id: str) -> gpd.GeoDataFrame:

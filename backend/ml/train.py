@@ -52,7 +52,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
 from ml import holdout  # noqa: E402
-from ml.negative_sampling import TERRAIN_FEATURE_COLUMNS, build_training_table  # noqa: E402
+from app.risk.features import LAND_COVER_CLASSES, engineer_features, feature_columns  # noqa: E402,F401
+from ml.negative_sampling import TERRAIN_FEATURE_COLUMNS, build_training_table  # noqa: E402,F401
 
 MODEL_VERSION = "xgb-terrain-v1"
 
@@ -60,24 +61,6 @@ MODEL_DIR = REPO_ROOT / "data" / "models"
 MODEL_PATH = MODEL_DIR / "xgb_terrain_v1.json"
 METADATA_PATH = MODEL_DIR / "model_metadata.json"
 CV_PREDICTIONS_PATH = MODEL_DIR / "cv_predictions.csv"
-
-# The one land-cover class set actually possible from scripts/build_grid.py's ESA WorldCover
-# join (see its LANDCOVER_CLASSES dict) — one-hot encoded rather than passed as a pandas
-# categorical dtype so risk/model.py doesn't need to reconstruct training-time category codes to
-# get consistent columns; it just reindexes to this fixed list and fills missing indicators 0.
-LAND_COVER_CLASSES = [
-    "tree_cover",
-    "shrubland",
-    "grassland",
-    "cropland",
-    "built_up",
-    "bare_sparse_vegetation",
-    "snow_ice",
-    "water",
-    "herbaceous_wetland",
-    "mangroves",
-    "moss_lichen",
-]
 
 # Conservative, small-n-appropriate hyperparameters — NOT tuned via a CV grid search (56 labeled
 # rows is too little data to do that credibly; a grid search would just fit noise). Shallow trees
@@ -94,28 +77,11 @@ XGB_PARAMS = dict(
     n_jobs=1,  # determinism (CLAUDE.md rule 13) — avoid multi-threaded histogram-build variance
 )
 
-
-def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Adds aspect_sin/aspect_cos (circular encoding of aspect_mean_deg — 359deg and 1deg are
-    nearly identical compass directions, which a raw degree value would hide from the model) and
-    one-hot land-cover indicators. Returns df with the final FEATURE_COLUMNS present."""
-    out = df.copy()
-    aspect_rad = np.radians(out["aspect_mean_deg"].astype(float))
-    out["aspect_sin"] = np.sin(aspect_rad)
-    out["aspect_cos"] = np.cos(aspect_rad)
-
-    for cls in LAND_COVER_CLASSES:
-        out[f"land_cover_{cls}"] = (out["land_cover_class"] == cls).astype(float)
-
-    for col in ("plan_curvature", "profile_curvature", "dist_to_fault_km", "lithology_class"):
-        out[col] = pd.to_numeric(out[col], errors="coerce")
-
-    return out
-
-
-def feature_columns() -> list[str]:
-    numeric = [c for c in TERRAIN_FEATURE_COLUMNS if c not in ("aspect_mean_deg", "land_cover_class")]
-    return numeric + ["aspect_sin", "aspect_cos"] + [f"land_cover_{cls}" for cls in LAND_COVER_CLASSES]
+# engineer_features()/feature_columns()/LAND_COVER_CLASSES now live in app/risk/features.py
+# (CLAUDE.md §5: "risk/ <- features, thresholds, model (XGBoost), explain (SHAP)") so risk/model.py
+# (task 1.17) engineers features identically at inference time — imported above, re-exported
+# under their original names here since this module (and its tests) already refer to
+# `train.engineer_features`/`train.feature_columns`/`train.LAND_COVER_CLASSES`.
 
 
 def assign_spatial_blocks(df: pd.DataFrame) -> pd.Series:
