@@ -1,0 +1,5 @@
+# Phase 3 dissemination dependencies (BUILD_PLAN.md task 3.4: dissemination/cap.py). Separate
+# from requirements.txt so people not touching CAP 1.2 XML generation/validation don't need
+# lxml's native libxml2/libxslt bindings just to run the Phase 0/1 test suite.
+
+lxml>=5.0,<6.0
