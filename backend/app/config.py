@@ -8,7 +8,7 @@ same AOI bounding box, so it lives here once instead of drifting across files.
 """
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AoiConfig(BaseModel):
@@ -50,3 +50,29 @@ def get_aoi(aoi_id: str) -> AoiConfig:
         return AOIS[aoi_id]
     except KeyError:
         raise KeyError(f"unknown AOI {aoi_id!r}; known AOIs: {sorted(AOIS)}") from None
+
+
+class EscalationConfig(BaseModel):
+    """Escalation stage thresholds (CLAUDE.md §4 glossary: Green Watch -> Yellow Pre-Alert ->
+    Orange Evacuation Ready -> Red Evacuate Now) plus the downgrade hysteresis margin, both
+    consumed by `decision/escalation.py` (BUILD_PLAN.md task 3.2).
+
+    The three entry thresholds match decision/stub.py's Phase 0 placeholder cutoffs on purpose —
+    escalation.py adds hysteresis + a real audit trail on top of behaviour the Phase 0 demo
+    already validated, it does not silently re-tune the alert boundaries too.
+
+    CLAUDE.md §4 says these weights/thresholds "must be tunable from the UI (the false-alarm-cost
+    slider is a demo feature, not a hidden constant)" — that UI wiring is Phase 5 task 5.6; this
+    class existing as a plain, mutable Pydantic model here is what makes that wiring possible
+    later without another schema change.
+    """
+
+    yellow_threshold: float = Field(default=0.25, ge=0.0, le=1.0)
+    orange_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    red_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    # How far below a stage's own entry threshold p_fail must fall before we leave that stage.
+    # See decision/escalation.py's module docstring for the full hysteresis rationale.
+    downgrade_hysteresis_margin: float = Field(default=0.1, ge=0.0, le=1.0)
+
+
+ESCALATION = EscalationConfig()
