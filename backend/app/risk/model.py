@@ -6,17 +6,22 @@ XGBoost Booster, not the sklearn wrapper — see that module's docstring for why
 engineered through the SAME `app.risk.features.engineer_features()` training used (no train/serve
 skew: one feature-engineering implementation, imported by both sides).
 
-**`p_fail` here is the raw model probability, not yet fused with `risk/thresholds.py`'s exceedance
-ratio** — task 1.19 (`risk/fusion.py`) does that; this module computes and reports
-`threshold_exceedance` on `CellRisk` (per the Appendix A schema) but leaves the fusion decision to
-its own module, per the task ordering in BUILD_PLAN.md (1.17 -> 1.18 -> 1.19). By the time 1.19 is
-also done, `predict_cell_risks()`'s returned `p_fail` is the fused value — see `risk/fusion.py`.
+**`p_fail` on the returned `CellRisk` is the task-1.19 FUSED value** —
+`risk/fusion.py`'s `max(ml_p_fail, capped threshold_exceedance)` — not the raw ML probability in
+isolation. `threshold_exceedance` is still reported on `CellRisk` separately (per the Appendix A
+schema) so a caller/UI can show both halves of the fusion, not just the combined result.
 
 **Confidence** is a simple, honestly-labeled heuristic — 1 minus the normalized binary entropy of
-the predicted probability (confidence=1 at p=0 or p=1, confidence=0 at p=0.5). This is NOT a
+the FUSED probability (confidence=1 at p=0 or p=1, confidence=0 at p=0.5). This is NOT a
 statistical confidence interval; with only 56 labeled training cells (see `data/models/
 eval_report.md`), a rigorous uncertainty quantification would itself be a false precision claim.
-It answers "how decisive is the model," nothing more.
+It answers "how decisive is the final reported number," nothing more.
+
+**SHAP attributions (task 1.18) are included by default** — `predict_batch()` calls
+`risk/explain.py`'s `explain_cells()` for the matched cells unless `include_attributions=False`;
+they describe the ML model's raw margin contributions (see `risk/explain.py`), not the fused
+probability, since SHAP's additive decomposition only applies to the model it was computed
+against.
 
 **Batched per-AOI**: `predict_cell_risks()` takes a whole `ObservationFrame`'s cells at once
 (matching CLAUDE.md §5's "batched per-AOI" requirement) rather than one cell at a time — the
@@ -39,6 +44,7 @@ import pandas as pd
 import xgboost as xgb
 
 from app.risk.features import engineer_features, feature_columns
+from app.risk.fusion import fuse_p_fail
 from app.risk.thresholds import threshold_exceedance_ratio
 from app.schemas.ingest import CellObservation
 from app.schemas.risk import CellRisk
@@ -101,10 +107,22 @@ class RiskModel:
 
         return cls(booster, metadata, terrain_by_cell)
 
-    def predict_batch(self, observations: list[CellObservation]) -> tuple[list[CellRisk], list[str]]:
+    def predict_batch(
+        self, observations: list[CellObservation], *, include_attributions: bool = True
+    ) -> tuple[list[CellRisk], list[str]]:
         """Returns (risks, unmatched_cell_ids). A cell_id with no terrain row (e.g. an AOI whose
-        grid doesn't cover it, or a stub/synthetic cell_id — see module docstring) is skipped, not
-        fabricated a p_fail; its id is reported in `unmatched_cell_ids` so a caller can log it."""
+        grid doesn't cover it, a no-valid-DEM-pixel cell, or a stub/synthetic cell_id — see module
+        docstring) is skipped, not fabricated a p_fail; its id is reported in `unmatched_cell_ids`
+        so a caller can log it.
+
+        `CellRisk.p_fail` is the task-1.19 FUSED value (`risk/fusion.py`'s
+        `max(ml_p_fail, capped threshold_exceedance)`), not the raw ML probability — see
+        `risk/fusion.py`'s docstring for the one-sentence rationale. `confidence` describes the
+        decisiveness of this final, fused value (the number actually shown alongside it), not the
+        ML model in isolation.
+
+        `include_attributions=False` skips the SHAP computation (task 1.18) — useful for callers
+        that only need p_fail/threshold_exceedance and want to avoid the extra cost."""
         if not observations:
             return [], []
 
@@ -117,19 +135,29 @@ class RiskModel:
 
         X = self.terrain_by_cell.loc[matched_ids]
         dmatrix = xgb.DMatrix(X, feature_names=list(X.columns))
-        p_fail_raw = self.booster.predict(dmatrix)
+        ml_p_fail_raw = self.booster.predict(dmatrix)
+
+        attributions_by_cell: dict[str, list] = {}
+        if include_attributions:
+            # Local import — app.risk.explain imports RiskModel from this module, so importing it
+            # at module scope here would be circular. A function-local import is the standard,
+            # narrow way around a two-module mutual dependency like this one.
+            from app.risk.explain import explain_cells
+
+            attributions_by_cell = explain_cells(self, matched_ids)
 
         risks: list[CellRisk] = []
-        for cell_id, p_fail in zip(matched_ids, p_fail_raw):
+        for cell_id, ml_p_fail in zip(matched_ids, ml_p_fail_raw):
             obs = obs_by_id[cell_id]
             exceedance = threshold_exceedance_ratio(obs)
+            fused_p_fail = fuse_p_fail(float(ml_p_fail), float(exceedance))
             risks.append(
                 CellRisk(
                     cell_id=cell_id,
-                    p_fail=float(p_fail),
+                    p_fail=fused_p_fail,
                     threshold_exceedance=float(exceedance),
-                    confidence=_confidence_from_probability(float(p_fail)),
-                    attributions=[],  # filled by risk/explain.py (task 1.18), not this module
+                    confidence=_confidence_from_probability(fused_p_fail),
+                    attributions=attributions_by_cell.get(cell_id, []),
                     model_version=self.model_version,
                 )
             )
