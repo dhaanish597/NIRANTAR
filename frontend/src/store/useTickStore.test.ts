@@ -41,9 +41,12 @@ beforeEach(() => {
   useTickStore.setState({
     latestTick: null,
     cellRisks: [],
+    roadRisks: [],
+    isolations: [],
     priorities: [],
     actionCards: [],
     auditEvents: [],
+    selectedVillageId: null,
   })
 })
 
@@ -97,5 +100,33 @@ describe('applyTick', () => {
     const tick = makeTick({ t: '2025-01-01T05:00:00+05:30' })
     useTickStore.getState().applyTick(tick)
     expect(useTickStore.getState().latestTick).toEqual(tick)
+  })
+
+  it('replaces roadRisks and isolations with the latest tick snapshot (task 2.7)', () => {
+    const roadRisk = {
+      edge_id: 'e1', name: 'NH-6', highway_class: 'trunk', is_bridge: false,
+      p_blocked: 0.9, severed: true, contributing_cells: ['aizawl_401'],
+    }
+    const isolation = {
+      village_id: 'v1', name: 'Durtlang', population: 4200, p_isolated: 0.8,
+      isolated_now: true, alternate_route_exists: false, est_duration_hours: 6,
+      severed_links: ['e1'],
+    }
+    useTickStore.getState().applyTick(makeTick({ road_risks: [roadRisk], isolations: [isolation] }))
+    expect(useTickStore.getState().roadRisks).toEqual([roadRisk])
+    expect(useTickStore.getState().isolations).toEqual([isolation])
+
+    useTickStore.getState().applyTick(makeTick({ road_risks: [], isolations: [] }))
+    expect(useTickStore.getState().roadRisks).toHaveLength(0)
+    expect(useTickStore.getState().isolations).toHaveLength(0)
+  })
+})
+
+describe('selectVillage', () => {
+  it('sets and clears selectedVillageId', () => {
+    useTickStore.getState().selectVillage('v1')
+    expect(useTickStore.getState().selectedVillageId).toBe('v1')
+    useTickStore.getState().selectVillage(null)
+    expect(useTickStore.getState().selectedVillageId).toBeNull()
   })
 })

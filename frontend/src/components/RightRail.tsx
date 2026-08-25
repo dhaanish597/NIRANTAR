@@ -1,10 +1,17 @@
-import type { ActionCard, EscalationStage, SettlementPriority } from '../types/schemas'
+import { mergeVillageDisplay, type VillageDisplayRecord } from '../lib/priorityDetail'
 import { useTickStore } from '../store/useTickStore'
+import type { ActionCard, EscalationStage } from '../types/schemas'
 
 export function RightRail() {
   const priorities = useTickStore((s) => s.priorities)
+  const isolations = useTickStore((s) => s.isolations)
   const actionCards = useTickStore((s) => s.actionCards)
+  const selectVillage = useTickStore((s) => s.selectVillage)
   const latestCard = actionCards[0]
+
+  // BUILD_PLAN.md task 2.7: population + isolation status per village, joined from
+  // TickResult.priorities and TickResult.isolations by village_id (see lib/priorityDetail.ts).
+  const villageRows = mergeVillageDisplay(priorities, isolations)
 
   return (
     <aside className="flex h-full w-80 flex-col gap-4 overflow-y-auto border-l border-white/10 bg-slate-900/80 p-4">
@@ -12,12 +19,12 @@ export function RightRail() {
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
           Priority list
         </h2>
-        {priorities.length === 0 && (
+        {villageRows.length === 0 && (
           <p className="text-sm text-slate-500">No settlements ranked yet.</p>
         )}
         <ul className="space-y-2">
-          {priorities.map((p) => (
-            <PriorityRow key={p.village_id} priority={p} />
+          {villageRows.map((row) => (
+            <PriorityRow key={row.villageId} row={row} onSelect={() => selectVillage(row.villageId)} />
           ))}
         </ul>
       </section>
@@ -33,11 +40,23 @@ export function RightRail() {
   )
 }
 
-function PriorityRow({ priority }: { priority: SettlementPriority }) {
+function PriorityRow({ row, onSelect }: { row: VillageDisplayRecord; onSelect: () => void }) {
   return (
-    <li className="flex items-center justify-between rounded bg-white/5 px-3 py-2 text-sm">
-      <span>{priority.village_id}</span>
-      <span className={tierBadgeClass(priority.tier)}>{priority.tier}</span>
+    <li>
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex w-full items-center justify-between rounded bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10"
+      >
+        <span className="flex flex-col">
+          <span>{row.name ?? row.villageId}</span>
+          <span className="text-xs text-slate-400">
+            {row.population !== null ? `pop. ${row.population.toLocaleString()}` : 'population unknown'}
+            {row.isolatedNow !== null && (row.isolatedNow ? ' · isolated' : ' · not isolated')}
+          </span>
+        </span>
+        <span className={tierBadgeClass(row.tier)}>{row.tier}</span>
+      </button>
     </li>
   )
 }
@@ -60,7 +79,7 @@ function ActionCardView({ card }: { card: ActionCard }) {
   )
 }
 
-function tierBadgeClass(tier: SettlementPriority['tier']): string {
+function tierBadgeClass(tier: VillageDisplayRecord['tier']): string {
   switch (tier) {
     case 'P1':
       return 'rounded bg-red-600 px-2 py-0.5 text-xs font-bold'

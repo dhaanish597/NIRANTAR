@@ -7,9 +7,11 @@ import type {
   AuditEvent,
   CellRisk,
   ModeState,
+  RoadSegmentRisk,
   ScenarioSummary,
   SettlementPriority,
   TickResult,
+  VillageIsolation,
 } from '../types/schemas'
 
 const MAX_ACTION_CARDS = 20
@@ -22,10 +24,16 @@ interface TickStoreState {
   modeState: ModeState | null
   latestTick: TickResult | null
   cellRisks: CellRisk[]
+  roadRisks: RoadSegmentRisk[]
+  isolations: VillageIsolation[]
   priorities: SettlementPriority[]
   actionCards: ActionCard[]
   auditEvents: AuditEvent[]
   error: string | null
+  /** BUILD_PLAN.md task 2.8: which village's detail drawer is open, set by clicking a map pin
+   * (MapView) or a Priority List row (RightRail). Lives here (not component-local state) so
+   * either entry point can open/close the same drawer. */
+  selectedVillageId: string | null
 
   connect: () => void
   disconnect: () => void
@@ -35,6 +43,7 @@ interface TickStoreState {
   /** Exposed (not just used internally by connect()) so it's directly unit-testable without a
    * real WebSocket — see src/store/useTickStore.test.ts. */
   applyTick: (tick: TickResult) => void
+  selectVillage: (villageId: string | null) => void
 }
 
 let disconnectSocket: (() => void) | null = null
@@ -46,10 +55,13 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
   modeState: null,
   latestTick: null,
   cellRisks: [],
+  roadRisks: [],
+  isolations: [],
   priorities: [],
   actionCards: [],
   auditEvents: [],
   error: null,
+  selectedVillageId: null,
 
   connect: () => {
     if (disconnectSocket) return // already connected
@@ -99,8 +111,12 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
     set((state) => ({
       latestTick: tick,
       cellRisks: tick.cell_risks,
+      roadRisks: tick.road_risks,
+      isolations: tick.isolations,
       priorities: tick.priorities,
       actionCards: [...tick.new_action_cards, ...state.actionCards].slice(0, MAX_ACTION_CARDS),
       auditEvents: [...tick.new_audit_events, ...state.auditEvents].slice(0, MAX_AUDIT_EVENTS),
     })),
+
+  selectVillage: (villageId: string | null) => set({ selectedVillageId: villageId }),
 }))

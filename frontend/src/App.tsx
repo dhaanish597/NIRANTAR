@@ -3,6 +3,7 @@ import { MapView } from './components/MapView'
 import { ModeBanner } from './components/ModeBanner'
 import { RightRail } from './components/RightRail'
 import { ScenarioPickerModal } from './components/ScenarioPickerModal'
+import { VillageDetailDrawer } from './components/VillageDetailDrawer'
 import { useTickStore } from './store/useTickStore'
 
 // Phase 0 scope: a single hardcoded AOI. Real AOI selection is out of scope until more than one
@@ -50,6 +51,7 @@ function App() {
         <RightRail />
       </div>
       <ScenarioPickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} />
+      <VillageDetailDrawer />
     </div>
   )
 }
