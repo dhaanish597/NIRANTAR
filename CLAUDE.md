@@ -246,8 +246,8 @@ make freeze                 # tag a known-good demo build
 
 > **Update this section every session. Keep it short and true.**
 
-- **Phase:** 1 — in progress. Tasks 1.1, 1.2, and 1.11 done and verified against real output (not
-  just "ran without error"). Phase 0 is complete (all 16 tasks done and verified).
+- **Phase:** 1 — in progress. Tasks 1.1, 1.2, 1.3, 1.5, and 1.11 done and verified against real
+  output (not just "ran without error"). Phase 0 is complete (all 16 tasks done and verified).
 - **Working end-to-end?** Yes, with entirely fabricated numbers, per Phase 0's DoD. Verified live
   in a real browser (not just tests): click **Run Case Study** → pick `_smoke` → mode banner
   flips to REPLAY, the 3×3 cell block escalates Green→Yellow→Orange→Red on the MapLibre map, the
@@ -257,7 +257,7 @@ make freeze                 # tag a known-good demo build
   `schemas/` (all Appendix A models), `ingest/{base,factory}.py` + `live/stub_source.py` +
   `replay/scenario_source.py`, `pipeline.py` + stub `risk/impact/decision/dissemination`,
   `audit/` (real in-memory hash chain), `api/` (`AppState`, REST routes), `ws/hub.py`, `main.py`.
-  130 backend tests passing (`backend/tests/`).
+  184 backend tests passing (`backend/tests/`).
 - **Frontend:** scaffolded and real for Phase 0's scope — Vite + React 19 + TS + Tailwind v4 +
   MapLibre GL v6 + Zustand. `ModeBanner`, `MapView` (self-contained style, no external tile
   requests — see note below), `RightRail`, `ScenarioPickerModal`. 11 frontend tests passing
@@ -266,12 +266,26 @@ make freeze                 # tag a known-good demo build
   `risk/thresholds.py` (the real I-D/E-D threshold engine, task 1.11) exists and is tested but is
   **not wired into the pipeline yet** — that's task 1.17/1.19, once `risk/model.py` also exists,
   so both halves of the fusion rule are available at once.
-- **Static data:** `data/static/aizawl/dem.tif` (real Copernicus DEM GLO-30) and
+- **Static data:** `data/static/aizawl/dem.tif` (real Copernicus DEM GLO-30),
   `data/static/aizawl/cells.gpkg` (2,912-cell 500m grid: elevation, slope, aspect, relief, TWI,
-  distance-to-road, land-cover) both exist, both real, both sanity-checked against actual values
-  (not just "no exception raised") — see session log. `cells.gpkg` has four intentionally-null
-  columns (see task 1.2's note in BUILD_PLAN.md): `plan_curvature`, `profile_curvature`,
-  `dist_to_fault_km`, `lithology_class`. No exposure data yet (task 1.3).
+  distance-to-road, land-cover; 212 of 2,912 cells legitimately null on terrain stats — edge
+  cells with no valid DEM pixel, inherited from task 1.2, not a new bug), and
+  `data/static/aizawl/exposure.gpkg` (task 1.3: 11 villages, 7 shelters, 19 hospitals, 0 bridges
+  — `man_made=bridge` is a rare OSM tag, documented, not a bug) all exist, all real, all
+  sanity-checked against actual values (not just "no exception raised") — see session log.
+  `cells.gpkg` has four intentionally-null columns (see task 1.2's note in BUILD_PLAN.md):
+  `plan_curvature`, `profile_curvature`, `dist_to_fault_km`, `lithology_class`. Villages carry
+  `population_worldpop_est`, a WorldPop-density-based estimate, not a Census figure — named
+  distinctly so it's never mistaken for ground truth.
+- **Database:** Docker Desktop is now running (was blocked, now fixed — see Required_by_me.md).
+  `docker-compose`'s `postgis` container is up and healthy. `scripts/load_db.py` (task 1.5) has
+  loaded Aizawl's cells + all four exposure layers into it for real — verified via direct `psql`
+  queries (row counts, `ST_SRID`), and confirmed idempotent by re-running the script and checking
+  counts didn't double. PostGIS only this pass — no SQLite/SpatiaLite fallback yet, a documented
+  scope cut (Docker being fixed removes the urgency).
+- **NASA COOLR:** `data/static/COOLR_Reports_Points.csv` obtained (14,963 rows, global scope, not
+  yet filtered to India/NER — that filtering is task 1.12's job, not done yet). Gitignored for
+  now pending a decision on committing a filtered subset (see Required_by_me.md).
 - **Scenarios ready:** `_smoke` only (fabricated, 10 frames, `data/scenarios/_smoke.json`). No
   real-event scenarios yet — those are Phase 4.
 - **Known gaps / deliberate deferrals (not blockers, but worth knowing about):**
@@ -293,25 +307,57 @@ make freeze                 # tag a known-good demo build
     mode-aware location, but flagging the addition since it wasn't literally named before.
   - `backend/app/config.py` now exists (Phase 1 needed it for AOI bounding boxes — see session
     log). `api/routes.py`'s `/api/aoi/{id}` now reads from it instead of its own duplicate dict.
-- **External access still needed** (see `Required_by_me.md`): Docker Desktop confirmed not
-  running (blocks 1.5); NASA Earthdata not yet requested (blocks 1.6, 1.7, and — corrected this
-  session — very likely 1.12 too, not the "public, no auth" I said earlier); IMD API access not
-  yet requested (blocks 1.8). GSI Bhukosh not yet requested (blocks 1.4's precise path, though
-  1.4 has a documented coarse fallback that doesn't need it). Tasks 1.1, 1.2, 1.11 (all done)
-  were not blocked by any of this.
-- **Known blockers:** none for the tasks I picked up this session. See `Required_by_me.md` for
-  what blocks the rest of Phase 1.
-- **Next action:** task 1.3 (`scripts/fetch_exposure.py` — villages/shelters/bridges/hospitals)
-  is mostly OSM + WorldPop + Census 2011, likely unblocked, and is the natural next static-data
-  task. Task 1.4's coarse-fallback path is also unblocked if GSI access hasn't come through.
-  1.12 needs the Earthdata-access question resolved first (see `Required_by_me.md`) before
-  attempting it for real.
+- **External access still needed** (see `Required_by_me.md`): NASA Earthdata account now exists
+  (`.env` has real credentials). IMD API access not yet requested (blocks 1.8, P1, circuit-broken
+  so not critical path). GSI Bhukosh not yet requested (blocks 1.4's precise path, though 1.4 has
+  a documented coarse fallback that doesn't need it). Docker Desktop is now running — no longer a
+  blocker for anything.
+- **Known blockers:** none for Phase 1's P0 critical path. IMD key and GSI Bhukosh are both P1
+  with documented fallbacks. See `Required_by_me.md` for the remaining open items.
+- **Next action:** task 1.4 (lithology — likely the coarse fallback, given GSI Bhukosh access is
+  still pending) or task 1.6 (`ingest/live/imerg.py` — IMERG rainfall, now unblocked by the
+  Earthdata account) are the natural next static/dynamic-data tasks. Task 1.12
+  (`ml/build_inventory.py`) can also start now that the raw COOLR CSV exists, but needs the
+  India/NER filtering + the gitignore/commit decision resolved first (see `Required_by_me.md`).
 
 ---
 
 ## 12. Session Log
 
 > Newest entry at the top. One entry per session. Keep each to ~5 lines.
+
+### 2026-08-25 — Session 2
+
+- **Did:** Verified Docker Desktop is now running (was blocked last session) and confirmed
+  `docker compose up -d postgis` brings up a healthy container. Investigated GSI Bhukosh and
+  NASA COOLR access in detail (portal structures, registration flows, an actual authenticated
+  test request against the COOLR ArcGIS endpoint that confirmed HTTP Basic Auth is the wrong
+  credential mechanism for it) — recorded findings in `Required_by_me.md` rather than leaving it
+  as an open question. User manually exported `COOLR_Reports_Points.csv` (14,963 rows, global
+  scope) via the NASA Earthdata GIS portal. Then did task 1.3: `scripts/fetch_exposure.py` —
+  villages/shelters/hospitals/bridges via OSM Overpass + a WorldPop-density-based population
+  estimate per village, run for real against Aizawl (11 villages, 7 shelters, 19 hospitals, 0
+  bridges — sanity-checked against real named places, not just "ran without error"). Then task
+  1.5: `scripts/load_db.py` — idempotent PostGIS loader (delete-then-insert per AOI), run for
+  real against the live `postgis` container and verified via direct `psql` queries (row counts,
+  `ST_SRID`), idempotency confirmed by re-running and checking counts didn't double.
+- **Broke / discovered:**
+  1. The public Overpass API rate-limited `fetch_exposure.py` (HTTP 429) after just 2 queries at
+     a 2s gap, then also returned transient 502/503/504s — added a retry-with-backoff wrapper
+     (respecting `Retry-After` when present) rather than a single fixed delay.
+  2. WorldPop's 100m population-COUNT raster advertises `Accept-Ranges: bytes` but a real GDAL
+     `/vsicurl/` windowed read against it failed ("Range downloading not supported by this
+     server!"), and a raw `curl -H "Range: ..."` against it hung rather than returning partial
+     content — confirmed by actually trying both, not assumed. Switched to the much smaller
+     (~18 MB) 1km population-DENSITY product, downloaded whole and cached, with population
+     estimated as `mean(density) * buffer_area_km2` per village — coarser, documented as such.
+  3. Found the user had briefly pasted real NASA Earthdata credentials into `.env.example` (a
+     tracked file) instead of `.env` — caught and reverted before it was committed, no leak
+     reached git history.
+- **Next:** task 1.4 (lithology, likely the coarse fallback) or task 1.6 (`ingest/live/imerg.py`,
+  now unblocked by the Earthdata account) are the natural next tasks. Task 1.12
+  (`ml/build_inventory.py`) can start now that raw COOLR data exists, but needs India/NER
+  filtering plus a decision on committing a filtered subset (`Required_by_me.md` has the detail).
 
 ### 2026-08-25 — Session 1
 

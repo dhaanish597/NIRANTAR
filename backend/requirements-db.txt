@@ -1,0 +1,9 @@
+# Phase 1 PostGIS loading (BUILD_PLAN.md task 1.5, scripts/load_db.py). Separate from
+# requirements.txt/requirements-geo.txt so people not touching the DB don't need psycopg2's
+# native build — same reasoning requirements-geo.txt gives for splitting out the geo stack.
+
+-r requirements-geo.txt
+
+sqlalchemy>=2.0,<3.0
+geoalchemy2>=0.15,<1.0
+psycopg2-binary>=2.9,<3.0
