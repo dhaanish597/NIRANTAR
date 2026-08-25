@@ -1,0 +1,46 @@
+# Phase 0 note: the Phase 0 stub pipeline does not touch this database at all — it runs
+# entirely in-process. This compose file exists now because task 0.1 calls for it and Phase 1+
+# needs PostGIS for real terrain/exposure data. `make up` starts only `postgis`; `make dev` runs
+# backend + frontend natively (hot reload, no container) per CLAUDE.md §8.
+#
+# The `backend` service is profiled out of the default `up`/`dev` flow — it's a containerized
+# alternative for later, not the Phase 0 demo path (CLAUDE.md rule 10: demo must run with the
+# network cable unplugged, which native `make dev` satisfies more simply than Docker does).
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: nirantar_postgis
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nirantar}
+      POSTGRES_USER: ${POSTGRES_USER:-nirantar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nirantar_dev_only}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nirantar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: nirantar_backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nirantar}:${POSTGRES_PASSWORD:-nirantar_dev_only}@postgis:5432/${POSTGRES_DB:-nirantar}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    profiles: ["full"]
+
+volumes:
+  postgis_data:

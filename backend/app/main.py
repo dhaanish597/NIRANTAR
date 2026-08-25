@@ -1,0 +1,46 @@
+"""FastAPI app entrypoint (BUILD_PLAN.md task 0.11). Wires api/ routers and the /ws/ticks hub
+onto one AppState instance. See docs/ARCHITECTURE.md §3 for what each module owns.
+"""
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routes import router as api_router
+from app.api.state import AppState
+from app.ws.hub import router as ws_router
+
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Vite dev server, CLAUDE.md §8
+    "http://127.0.0.1:5173",
+]
+
+
+def create_app(*, realtime: bool = True) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        app.state.app_state = AppState(realtime=realtime)
+        app.state.app_state.start()  # begin the LIVE stub tick stream immediately
+        yield
+        await app.state.app_state.shutdown()
+
+    app = FastAPI(title="NIRANTAR — NER Landslide Early Warning", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.include_router(api_router)
+    app.include_router(ws_router)
+
+    @app.get("/healthz")
+    async def healthz() -> dict:
+        return {"status": "ok"}
+
+    return app
+
+
+app = create_app()

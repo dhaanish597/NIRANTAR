@@ -1,0 +1,319 @@
+# CLAUDE.md — NER Landslide Early Warning & Risk Monitoring System
+
+> **Read this file in full at the start of every session, before touching any code.**
+> **Update the `Session Log` and `Current State` sections at the end of every session.**
+> If anything in this file contradicts what you find in the code, the code is wrong or this file is stale — say so explicitly and ask before proceeding.
+
+---
+
+## 1. What this project is
+
+We are building **SIH26001** for Smart India Hackathon 2026.
+
+| | |
+|---|---|
+| Problem statement | SIH26001 — AI-Based Early Warning and Landslide Risk Monitoring System in NER |
+| Ministry | MDoNER (Ministry of Development of North Eastern Region) |
+| Category | **Software** (no custom hardware may be part of the solution) |
+| Theme | Disaster Management |
+| Internal round deadline | **20 September 2026** |
+| Primary success metric | **Judge perception.** A feature that judges cannot see, understand, or believe is worth zero regardless of technical merit. |
+
+### The thesis (memorize this — every design decision descends from it)
+
+India is not short of landslide *prediction*. GSI's National Landslide Forecasting Centre, NESAC's FLEWS, ISRO's Bhuvan and NDMA's SACHET all exist. People die anyway, because:
+
+1. Warnings are **regional, not slope-specific** (taluk/district colour codes).
+2. Warnings **do not reach the last village** (~1,841 NER villages have no mobile coverage).
+3. There is **no accountable chain** from a bulletin to an actual evacuation.
+4. Nobody predicts **which road will be cut and which village will be isolated** — the thing MDoNER actually cares about.
+
+So: **we are not building "another prediction model." We are building the decision-and-dissemination layer that sits on top of existing public feeds and closes those four gaps.**
+
+One-line pitch:
+> *"We don't just predict landslides — we make sure the warning reaches the last village and tells them exactly where to go, before the road is gone."*
+
+---
+
+## 2. The demo (this drives the entire architecture)
+
+The product runs in **two modes** and the mode is a first-class concept in the codebase.
+
+- **LIVE mode** — real feeds (IMD / IMERG / SMAP / Sentinel-1), wall-clock time. This is the default state of the dashboard.
+- **REPLAY mode** — a judge presses **"Run Case Study"**, picks a real historical disaster (Aizawl 2024, Tupul 2022, Wayanad 2024, Sikkim GLOF 2023), and the system's live inputs are **swapped for that event's reconstructed data**, played back on an accelerated clock. Every downstream component behaves *identically*. The map lights up, the risk engine escalates, roads get flagged, villages get ranked, action cards fire, the audit trail fills — in front of the judges, in ~90 seconds.
+
+At the end of a replay, the system shows a **Counterfactual Lead-Time Scorecard**: what our system would have issued, at what hour, versus what actually happened.
+
+### THE CENTRAL ARCHITECTURAL INVARIANT
+
+> **REPLAY must not be a separate code path. It is a different `Clock` and a different `DataSource` feeding the exact same pipeline.**
+
+If you ever find yourself writing `if mode == REPLAY:` anywhere *below* the ingest layer, stop — you are building a fake demo and it will fall apart under a judge's question. The only places allowed to know about mode are:
+
+- `core/mode.py` (the state machine)
+- `core/clock.py` (which clock is instantiated)
+- `ingest/` (which source is instantiated)
+- The UI mode banner
+
+Everything else — risk, impact, decision, dissemination, audit — receives a timestamp and a set of observations and does not know or care where they came from.
+
+---
+
+## 3. Non-negotiable rules
+
+### Honesty rules (these win or lose the pitch)
+1. **Never state a prediction accuracy number that we have not measured** with spatial cross-validation on held-out data. No "99% accurate." A GSI/NESAC geologist on the panel will destroy it.
+2. **Any scenario replay event must be excluded from model training data.** Held-out status must be displayed on screen during the replay ("Aizawl 2024 — held out of training"). This is a credibility multiplier; treat leakage as a P0 bug.
+3. **All reconstructed scenario data must be labelled as reconstructed**, with its published source, in the UI and in the scenario file's `provenance` block. Never present reconstructed rainfall as if it were archived observation.
+4. **InSAR is scoped to slow / deep-seated deformation only.** It does not catch sudden shallow rainfall-triggered debris flows. Say so in the UI. Do not overclaim "weeks of lead time" universally.
+5. **Satellite soil moisture (SMAP/ESA CCI) is a topsoil proxy**, not pore-water pressure. Frame it as NASA LHASA v2 does — a surrogate, fused with antecedent rainfall.
+6. Show **confidence, provenance, and "not detected" caveats** in the product rather than hiding them.
+
+### Scope rules
+7. **No custom hardware.** Category is Software. We may *ingest* from hypothetical state sensor networks via an open REST endpoint, but we deploy nothing physical.
+8. **Integrate, don't rebuild.** We consume GSI / IMD / NESAC / Bhuvan data and we emit **CAP 1.2** into SACHET's rails. We are a partner to the national system, never a replacement. Say this in code comments and in the UI.
+9. **NER-first.** No generic pan-India model. Wayanad is used as the opening emotional hook only; all other scenarios and the primary AOI are North East.
+10. **The demo must run with the network cable unplugged.** All data required for a scenario replay is pre-baked into `data/`. No live API call may be on the demo critical path.
+
+### Engineering rules
+11. **Vertical slice first, depth second.** A stubbed end-to-end pipeline that renders on the map beats a brilliant risk model with no UI. Phase 0 exists for this reason.
+12. **Schemas are the spine.** Every inter-module boundary is a Pydantic model in `backend/app/schemas/`. Change the schema first, then the producers, then the consumers.
+13. **Determinism.** Given the same scenario file and the same model artifact, a replay must produce byte-identical output. Seed everything. No `random` without a seed, no `datetime.now()` outside `core/clock.py`.
+14. **`datetime.now()` is banned outside `core/clock.py`.** Everything else calls `clock.now()`. There is a test that enforces this — do not delete it.
+15. Never commit large binaries. `data/` derived artifacts are produced by `scripts/` and gitignored except for scenario JSON and small vector files.
+
+---
+
+## 4. Domain glossary (use these exact terms in code and UI)
+
+| Term | Meaning |
+|---|---|
+| **AOI** | Area of Interest — a pilot district we have pre-baked data for. |
+| **Cell** | 500 m analysis unit inside an AOI. Carries static terrain features + dynamic observations. Primary key `cell_id`. |
+| **P_fail** | Probability of slope failure for a cell at a tick, ∈ [0,1]. Output of the risk engine. |
+| **Runout envelope** | Predicted downslope debris travel polygon from a failing cell. |
+| **RII — Road Isolation Index** | Per-village score for likelihood + duration of being cut off, computed on the OSM road graph. **Our signature differentiator.** |
+| **EPS — Evacuation Priority Score** | Per-settlement rank fusing P_fail, population, RII, shelter accessibility. Bucketed P1 / P2 / P3. |
+| **P1 / P2 / P3** | Immediate Mandatory Evacuation / Evacuation Ready / Watch. |
+| **Action Card** | The village-facing artifact: where to go, which road to avoid, nearest usable shelter, what to do now — in local language + voice. |
+| **Escalation stage** | Green Watch → Yellow Pre-Alert → Orange Evacuation Ready → Red Evacuate Now. |
+| **Audit trail** | Timestamped chain: AI Flagged → DDMA Approved → Disseminated → Village Acknowledged. |
+| **Tick** | One step of the pipeline for one timestamp. LIVE = every N minutes; REPLAY = every scenario frame. |
+| **Frame** | One timestamped bundle of observations in a scenario file. |
+| **DDMA** | District Disaster Management Authority — our primary institutional user. |
+| **Safe evacuation window** | Estimated time until critical risk. **Never** call this "time to landslide" — we do not predict exact timing. |
+
+### Reference formulae (NE Himalaya — cite these, they impress geologist judges)
+- Intensity–Duration threshold: `I = 5.8294 × D^(-0.4141)` (I in mm/h, D in hours)
+- Event–Duration threshold: `E = -11.10 + 0.62 × D` (E in mm, valid 24 < D < 1440 h)
+- Dynamic routing cost: `C_edge = L_edge × (1 + α·P_fail + β·S_slope)`; edge severed if `P_fail > P_crit`
+- Evacuation priority: `EPS = w1·P_fail + w2·E_pop + w3·RII + w4·(1 − A_shelter)`
+
+Weights and constants live in `backend/app/config.py` and **must be tunable from the UI** (the false-alarm-cost slider is a demo feature, not a hidden constant).
+
+---
+
+## 5. Repository layout
+
+```
+.
+├── CLAUDE.md                  <- this file
+├── docs/
+│   ├── BUILD_PLAN.md          <- phased plan; check off tasks here
+│   ├── ARCHITECTURE.md        <- data contracts + module responsibilities
+│   ├── DEMO_SCRIPT.md         <- the 8-minute pitch, beat by beat
+│   └── reference/             <- team research docs (READ-ONLY source of truth)
+├── docker-compose.yml
+├── Makefile
+├── .env.example
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── config.py          <- all tunable constants, no magic numbers elsewhere
+│   │   ├── core/
+│   │   │   ├── clock.py       <- LiveClock | ScenarioClock  (ONLY datetime.now() here)
+│   │   │   ├── mode.py        <- LIVE/REPLAY state machine
+│   │   │   └── bus.py         <- in-process pub/sub for tick events
+│   │   ├── schemas/           <- Pydantic contracts (the spine)
+│   │   ├── ingest/
+│   │   │   ├── base.py        <- DataSource protocol
+│   │   │   ├── live/          <- imd.py, imerg.py, smap.py, insar.py
+│   │   │   └── replay/        <- scenario_source.py
+│   │   ├── risk/              <- features, thresholds, model (XGBoost), explain (SHAP)
+│   │   ├── impact/            <- runout, road_graph, isolation (RII), priority (EPS)
+│   │   ├── decision/          <- routing, action_card, escalation, window
+│   │   ├── dissemination/     <- cap.py (CAP 1.2), channels.py, tts.py
+│   │   ├── audit/             <- append-only hash-chained event log
+│   │   ├── api/                <- FastAPI routers
+│   │   └── ws/                <- websocket hub pushing ticks to the UI
+│   ├── ml/                    <- training scripts, spatial CV, evaluation reports
+│   └── tests/
+├── frontend/                  <- React + Vite + TS + MapLibre + Tailwind, PWA
+├── data/
+│   ├── static/                <- DEM derivatives, lithology, admin, villages, shelters
+│   ├── osm/                   <- pre-baked road graphs per AOI
+│   ├── scenarios/             <- case study fixtures (COMMITTED)
+│   ├── models/                <- trained artifacts + eval reports
+│   └── tiles/                 <- PMTiles for offline map
+└── scripts/                   <- one-shot data build scripts (idempotent, re-runnable)
+```
+
+---
+
+## 6. Stack
+
+| Layer | Choice | Notes |
+|---|---|---|
+| Backend | Python 3.11, FastAPI, Pydantic v2, Uvicorn | |
+| DB | PostgreSQL 16 + PostGIS 3.4 (Docker) | SQLite fallback must exist for laptop-only demo |
+| ML | XGBoost, scikit-learn, SHAP | LHASA v2 is the reference architecture |
+| Geo | GeoPandas, Rasterio, Shapely, NetworkX, OSMnx | OSMnx only in `scripts/`, never at runtime |
+| Realtime | FastAPI WebSocket | one channel, `/ws/ticks` |
+| Frontend | React 18 + Vite + TypeScript | |
+| Map | MapLibre GL JS + PMTiles | vector tiles for low bandwidth + offline |
+| Styling | Tailwind CSS | |
+| Offline | vite-plugin-pwa, IndexedDB (`idb`) | |
+| Language | AI4Bharat IndicTrans2 + Indic-Parler-TTS | pre-generate audio for demo; live call is a stretch |
+
+---
+
+## 7. Pilot AOIs and scenarios
+
+| AOI | Why | Priority |
+|---|---|---|
+| **Aizawl, Mizoram** | NH-6 severed at Hunthar in 2024, Aizawl isolated from the country. Perfect RII demo. | **Primary** |
+| **Noney/Tupul, Manipur** | 2022 railway site failure, 61 dead, Ijai river dammed. Site was mapped low-moderate susceptibility. | Secondary |
+| **Wayanad, Kerala** | Opening hook only: a warning existed ~16 h ahead, 200–400+ dead. Accountability failure. | Hook |
+| **Mangan / South Lhonak, Sikkim** | GLOF cascade. **Different hazard physics** — stretch goal, do not attempt before Phase 5. | Stretch |
+
+Scenario files live in `data/scenarios/<id>.json`. Schema is in `docs/ARCHITECTURE.md`. Every scenario carries a `provenance` block with published sources and a `ground_truth` block used to build the counterfactual scorecard.
+
+---
+
+## 8. Common commands
+
+```bash
+make up             # start postgres/postgis
+make dev            # backend (:8000) + frontend (:5173) with hot reload
+make data AOI=aizawl        # build derived static data for an AOI
+make graph AOI=aizawl       # build + cache the OSM road graph
+make train                  # train risk model with spatial CV, write eval report
+make scenario ID=aizawl-2024   # validate + dry-run a scenario file
+make test                   # pytest + vitest
+make demo-check             # PREFLIGHT: verifies offline demo readiness. Run before every rehearsal.
+make freeze                 # tag a known-good demo build
+```
+
+`make demo-check` must verify: models present, scenarios validate, tiles present, road graphs cached, no network calls in the replay path, all four scenarios complete a full run.
+
+---
+
+## 9. What we deliberately do NOT build
+
+- Custom IoT / soil-moisture sensors (violates Software category).
+- A from-scratch alerting pipe (we emit CAP 1.2 into SACHET's rails).
+- A generic pan-India model.
+- Autonomous evacuation orders. **Human-in-the-loop always** — the AI recommends, a DDMA officer approves. Say this out loud in the UI.
+- Any headline accuracy claim we have not measured.
+- Reinforcement learning, LLM agent swarms, blockchain, or anything else that adds demo risk without adding judge-legible value.
+
+---
+
+## 10. Working protocol for Claude Code
+
+**At session start:**
+1. Read this file.
+2. Read `docs/BUILD_PLAN.md` and identify the current phase and the next unchecked task.
+3. Read `docs/ARCHITECTURE.md` if you will touch a module boundary.
+4. State in one short paragraph: what phase we are in, what you are about to do, and what you will *not* do this session.
+
+**During:**
+- Work on **one task at a time**. Do not start Phase N+1 work while Phase N has unchecked P0 items.
+- Write the Pydantic schema before the implementation.
+- Write at least one test per module that proves the contract holds.
+- If a task turns out to be bigger than the plan assumed, say so and propose a cut rather than silently expanding scope.
+- If you need a fact about the disasters, the government systems, the thresholds, or the data sources, read `docs/reference/`. **Do not invent facts, figures, death tolls, or accuracy numbers.** If it is not in the reference docs, mark it `TODO(verify)` and move on.
+
+**At session end (mandatory):**
+1. Check off completed items in `docs/BUILD_PLAN.md`.
+2. Update `## 11. Current State` below.
+3. Append a dated entry to `## 12. Session Log` below: what was done, what broke, what the next session should do first.
+4. Run `make test` and report the result honestly, including failures.
+
+---
+
+## 11. Current State
+
+> **Update this section every session. Keep it short and true.**
+
+- **Phase:** 0 — complete (all 16 tasks done and verified). Ready to start Phase 1.
+- **Working end-to-end?** Yes, with entirely fabricated numbers, per Phase 0's DoD. Verified live
+  in a real browser (not just tests): click **Run Case Study** → pick `_smoke` → mode banner
+  flips to REPLAY, the 3×3 cell block escalates Green→Yellow→Orange→Red on the MapLibre map, the
+  priority list moves P3→P1, an action card ("Evacuate Now" / RED) appears with shelter + roads
+  to avoid, one `AI_FLAGGED` audit event is written per tick.
+- **Backend:** scaffolded and real for Phase 0's scope — `core/{clock,mode,bus}.py`,
+  `schemas/` (all Appendix A models), `ingest/{base,factory}.py` + `live/stub_source.py` +
+  `replay/scenario_source.py`, `pipeline.py` + stub `risk/impact/decision/dissemination`,
+  `audit/` (real in-memory hash chain), `api/` (`AppState`, REST routes), `ws/hub.py`, `main.py`.
+  130 backend tests passing (`backend/tests/`).
+- **Frontend:** scaffolded and real for Phase 0's scope — Vite + React 19 + TS + Tailwind v4 +
+  MapLibre GL v6 + Zustand. `ModeBanner`, `MapView` (self-contained style, no external tile
+  requests — see note below), `RightRail`, `ScenarioPickerModal`. 11 frontend tests passing
+  (`frontend/src/**/*.test.ts(x)`).
+- **Risk model:** not trained — Phase 0's `risk/stub.py` is a fabricated linear function of
+  `rain_1h`, clearly labelled as a stub. Real model is Phase 1C.
+- **Scenarios ready:** `_smoke` only (fabricated, 10 frames, `data/scenarios/_smoke.json`). No
+  real-event scenarios yet — those are Phase 4.
+- **Known gaps / deliberate deferrals (not blockers, but worth knowing about):**
+  - `RunoutEnvelope` is computed by `impact/stub.py` but has no field on `TickResult`
+    (Appendix A) — not broadcast to the frontend yet. Phase 2 needs to decide how runout geometry
+    reaches the UI (a schema addition vs. a separate endpoint).
+  - `MapView` renders a **self-contained MapLibre style with no basemap imagery** — a solid
+    background plus our own risk-cell layer, no external tile requests at all. This was a
+    deliberate choice so CLAUDE.md rule 10 ("demo runs with the network cable unplugged") holds
+    from Phase 0 on rather than being deferred to Phase 5's PMTiles work (task 5.2). Phase 5 adds
+    a real offline basemap *underneath* the existing layer, it doesn't replace this setup.
+  - Cell geometry in Phase 0 is **synthetic** (`frontend/src/lib/grid.ts` derives a 3×3 square
+    layout from the `cell_id` naming convention, centered on a stub AOI coordinate) — not real
+    terrain data. Phase 1's `scripts/build_grid.py` replaces this; `grid.ts` gets deleted then.
+  - `backend/app/config.py` (mentioned in CLAUDE.md §5/§4 for tunable constants) does not exist
+    yet — Phase 0's stub thresholds are fabricated throwaway numbers local to their stub modules,
+    not the real tunable formula constants. Introducing config.py now would just be clutter to
+    clean up when Phase 1–3 land the real formulas.
+  - `ingest/factory.py` (new, not in the original file list) is the one place outside `core/`
+    that branches on mode — consistent with CLAUDE.md §2 naming `ingest/` as an allowed
+    mode-aware location, but flagging the addition since it wasn't literally named before.
+- **Known blockers:** none.
+- **Next action:** Phase 1 (`docs/BUILD_PLAN.md` §Phase 1) — start with 1A static data
+  (`scripts/fetch_dem.py`), or 1B dynamic adapters, per whichever the team prioritizes first.
+
+---
+
+## 12. Session Log
+
+> Newest entry at the top. One entry per session. Keep each to ~5 lines.
+
+### 2026-08-25 — Session 1
+
+- **Did:** All of Phase 0 (tasks 0.1–0.16). Repo scaffold, `docs/ARCHITECTURE.md`, every Appendix A
+  schema, `Clock`/`ModeMachine`/`Bus`, ingest (live stub + scenario replay), the stub pipeline,
+  the real hash-chained audit log, FastAPI + `/ws/ticks`, and the full frontend (MapLibre, mode
+  banner, right rail, scenario picker). Verified live in a browser end to end, not just in tests.
+- **Broke / discovered:**
+  1. Caught (via the determinism test) that the audit event's `event_id` used `uuid.uuid4()` —
+     unseeded randomness, violates rule 13. Fixed to a deterministic id.
+  2. Caught a real concurrency bug in `api/state.py`: the background task read
+     `self.mode.state` inside its own body instead of at the moment `_restart_tick_task()` was
+     called. Since `asyncio.create_task` only schedules (doesn't run immediately), a task could
+     start after a later transition had already mutated mode state, reading the wrong mode. Fixed
+     by capturing mode/scenario_id/clock/source synchronously at transition time.
+  3. Vite's esbuild dependency pre-bundler doesn't emit MapLibre's worker chunk, so the map
+     silently never finished loading (no error — cells just never painted). Fixed with
+     `optimizeDeps: { exclude: ['maplibre-gl'] }`.
+  4. The Makefile's `python`/`uvicorn` calls resolved to an unrelated global Python install, not
+     `backend/.venv` — `make test` was silently not testing what `requirements.txt` describes.
+     Fixed with a `VENV_PY` variable resolved by testing which venv layout actually exists.
+- **Next:** Start Phase 1 (real data + risk engine). Read the gaps list in §11 first — especially
+  the `RunoutEnvelope`/`TickResult` gap and the synthetic-geometry note — before Phase 2 impact
+  work assumes either is already solved.

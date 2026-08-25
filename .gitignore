@@ -1,0 +1,46 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/dev-dist/
+frontend/.vite/
+*.local
+
+# --- Env ---
+.env
+.env.*
+!.env.example
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Editors ---
+.vscode/
+.idea/
+
+# --- Derived data artifacts (rebuilt by scripts/, never committed) ---
+# data/scenarios is intentionally NOT ignored — scenario JSON is committed (CLAUDE.md rule 15).
+data/static/*
+!data/static/.gitkeep
+data/osm/*
+!data/osm/.gitkeep
+data/models/*
+!data/models/.gitkeep
+data/tiles/*
+!data/tiles/.gitkeep
+
+# --- Misc ---
+*.pid
