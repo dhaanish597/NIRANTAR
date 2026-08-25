@@ -87,6 +87,15 @@ class RiskModel:
                 f"{cells_path} not found — run `python scripts/build_grid.py --aoi {aoi_id}` first"
             )
         cells = gpd.read_file(cells_path)
+        # Cells with no valid DEM pixel (task 1.2 — 212 of Aizawl's 2,912) carry entirely null
+        # core terrain columns. XGBoost would still happily predict on them (native missing-value
+        # handling), but a "confident-looking" p_fail for a cell we structurally have zero real
+        # terrain data about is exactly the kind of unearned-precision claim CLAUDE.md rule 6
+        # warns against — dropped here so they behave like any other unmatched cell_id (reported,
+        # not fabricated a risk value), consistent with ml/negative_sampling.py excluding the same
+        # cells "from everything."
+        has_terrain = cells["slope_mean_deg"].notna() & cells["elevation_m"].notna()
+        cells = cells[has_terrain]
         cells = engineer_features(cells)
         terrain_by_cell = cells.set_index("cell_id")[feature_columns()]
 

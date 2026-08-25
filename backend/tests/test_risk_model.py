@@ -64,7 +64,20 @@ class TestRealAizawlModel:
     def test_load_returns_a_usable_model(self):
         model = risk_model.RiskModel.load("aizawl")
         assert model.model_version == "xgb-terrain-v1"
-        assert len(model.terrain_by_cell) == 2912
+        # 2,912 total Aizawl cells minus the 212 with no valid DEM pixel (task 1.2) — those are
+        # dropped at load time so they never receive a fabricated risk value (see model.py).
+        assert len(model.terrain_by_cell) == 2912 - 212
+
+    def test_dropped_no_terrain_cells_are_unmatched_not_predicted(self):
+        model = risk_model.RiskModel.load("aizawl")
+        import geopandas as gpd
+
+        cells = gpd.read_file(risk_model.REPO_ROOT / "data" / "static" / "aizawl" / "cells.gpkg")
+        no_terrain_ids = cells[cells["slope_mean_deg"].isna()]["cell_id"].tolist()
+        assert no_terrain_ids, "expected at least one no-terrain cell in the real Aizawl grid"
+        risks, unmatched = model.predict_batch([_obs(no_terrain_ids[0])])
+        assert risks == []
+        assert unmatched == [no_terrain_ids[0]]
 
     def test_predict_batch_on_real_cell_ids(self):
         model = risk_model.RiskModel.load("aizawl")
