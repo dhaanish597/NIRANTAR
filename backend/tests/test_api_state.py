@@ -15,6 +15,7 @@ import asyncio
 import pytest
 
 from app.api.state import AppState
+from app.audit.hash_chain import GENESIS_HASH
 from app.core.bus import Topic
 from app.ingest.factory import UnknownScenarioError
 from app.schemas.mode import RunMode
@@ -102,6 +103,39 @@ async def test_replay_reaching_its_end_returns_to_live_automatically(app_state: 
     assert seen_replay, "expected to observe at least one REPLAY tick"
     assert seen_live_after_replay, "expected replay to auto-return to LIVE after its last frame"
     assert app_state.mode.state.mode is RunMode.LIVE
+
+
+async def test_restarting_a_replay_fully_resets_the_audit_log_with_no_residue(app_state: AppState):
+    """BUILD_PLAN.md task 4.7: "Restart must fully reset downstream state — no residue from the
+    previous run." A judge clicking "Run Case Study" a second time (same scenario or a different
+    one) must not see the first run's audit hash chain bleeding into the second — otherwise two
+    identical replays wouldn't produce identical TickResults, a real determinism violation
+    (CLAUDE.md rule 13), not just a cosmetic one."""
+    app_state.start()
+    await app_state.start_replay("_smoke")
+    async with app_state.bus.subscribe(Topic.TICK) as queue:
+        seen = 0
+        for _ in range(MAX_DRAIN):
+            tick = await asyncio.wait_for(queue.get(), timeout=TIMEOUT)
+            if tick.mode is RunMode.REPLAY:
+                seen += 1
+                if seen >= 3:
+                    break
+        assert seen >= 3, "expected at least 3 REPLAY ticks before restarting"
+
+    events_before_restart = len(app_state.pipeline.audit_log.events)
+    assert events_before_restart >= 3
+
+    # Restart the SAME scenario — this is exactly what a second "Run Case Study" click does.
+    await app_state.start_replay("_smoke")
+    assert app_state.pipeline.audit_log.events == []
+    assert app_state.pipeline.audit_log.last_hash == GENESIS_HASH
+
+    async with app_state.bus.subscribe(Topic.TICK) as queue:
+        first_tick_after_restart = await drain_until_mode(queue, RunMode.REPLAY)
+    # The very first audit event of the new run must chain from the genesis hash, not from
+    # wherever the previous run's chain left off.
+    assert first_tick_after_restart.new_audit_events[0].prev_hash == GENESIS_HASH
 
 
 async def test_shutdown_cancels_the_background_task_cleanly():

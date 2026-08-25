@@ -98,3 +98,31 @@ class TestScenarioClock:
         for hours in (1, 2, 5, 10):
             target = a.start + timedelta(hours=hours)
             assert a.advance(to=target) == b.advance(to=target)
+
+    # -- seek() : the scrub-to-timestamp primitive (BUILD_PLAN.md task 4.7) ----------------------
+
+    def test_seek_jumps_forward(self):
+        clock = self.make()
+        target = clock.start + timedelta(hours=30)
+        assert clock.seek(target) == target
+        assert clock.now() == target
+
+    def test_seek_jumps_backward_unlike_advance(self):
+        """The whole reason seek() exists separately from advance(): advance() forbids moving
+        backward (the right guard for ordinary playback), but scrubbing to an earlier point on
+        the timeline is a legitimate replay-control operation."""
+        clock = self.make()
+        clock.advance(to=clock.end)
+        assert clock.finished is True
+        earlier = clock.start + timedelta(hours=5)
+        assert clock.seek(earlier) == earlier
+        assert clock.now() == earlier
+        assert clock.finished is False
+
+    def test_seek_clamps_to_the_clock_window(self):
+        clock = self.make()
+        past_end = clock.end + timedelta(days=1)
+        assert clock.seek(past_end) == clock.end
+
+        before_start = clock.start - timedelta(days=1)
+        assert clock.seek(before_start) == clock.start

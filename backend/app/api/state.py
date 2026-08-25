@@ -49,6 +49,13 @@ class AppState:
             speed_factor=scenario.clock.default_speed_factor,
             scenario_time=scenario.clock.start,
         )
+        # A fresh Pipeline (and therefore a fresh audit hash chain) every time — "Run Case Study"
+        # must fully reset downstream state on restart (BUILD_PLAN.md task 4.7), whether this is
+        # the very first replay, a restart of the same scenario, or a switch to a different one.
+        # Without this, a second click would carry over the first run's audit_log.events and
+        # prev_hash chain, so two identical replays would NOT produce identical TickResults —
+        # a real determinism violation (CLAUDE.md rule 13), not just a cosmetic UI oddity.
+        self.pipeline = Pipeline()
         self._restart_tick_task()
 
     async def stop_replay(self) -> None:
@@ -67,10 +74,19 @@ class AppState:
         mode_at_start = self.mode.state.mode
         scenario_id_at_start = self.mode.state.scenario_id
         clock, source = build_clock_and_source(self.mode.state, realtime=self._realtime)
+        # Captured synchronously for the exact same reason mode/clock/source are (see module
+        # docstring): `start_replay()` (BUILD_PLAN.md task 4.7) reassigns `self.pipeline` to a
+        # fresh Pipeline so a restarted replay's audit log has no residue from the previous run.
+        # If `_run` read `self.pipeline` itself instead of a value captured at creation time, a
+        # not-yet-cancelled OLD task could resume after that reassignment and write its leftover
+        # frames into the NEW (freshly reset) Pipeline — contaminating the very audit log the
+        # reset was meant to protect. Binding `pipeline` here, once, closes that race exactly the
+        # way mode_at_start/scenario_id_at_start/clock/source already do.
+        pipeline = self.pipeline
         logger.info("tick loop starting: mode=%s scenario=%s", mode_at_start, scenario_id_at_start)
 
         new_task = asyncio.create_task(
-            self._run(old_task, mode_at_start, scenario_id_at_start, clock, source)
+            self._run(old_task, mode_at_start, scenario_id_at_start, clock, source, pipeline)
         )
         self._task = new_task
 
@@ -81,6 +97,7 @@ class AppState:
         scenario_id_at_start: str | None,
         clock: Clock,
         source: DataSource,
+        pipeline: Pipeline,
     ) -> None:
         if old_task is not None:
             old_task.cancel()
@@ -90,7 +107,7 @@ class AppState:
         this_task = asyncio.current_task()
 
         async for frame in source.frames():
-            tick = self.pipeline.process(frame, mode=mode_at_start, scenario_id=scenario_id_at_start)
+            tick = pipeline.process(frame, mode=mode_at_start, scenario_id=scenario_id_at_start)
             self.mode.update_scenario_time(tick.t)
             await self.bus.publish(Topic.TICK, tick)
 

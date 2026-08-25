@@ -39,8 +39,10 @@ graph:
 train:
 	@echo "TODO(Phase 1): ml/train.py"
 
+# BUILD_PLAN.md task 4.1: validates data/scenarios/*.json (or just ID, if given) — schema,
+# CLAUDE.md honesty rules, and a real dry-run of every cell through the replay merge logic.
 scenario:
-	@echo "TODO(Phase 4): scripts/validate_scenario.py --id $(ID)"
+	backend/$(VENV_PY) scripts/validate_scenario.py $(ID)
 
 freeze:
 	@echo "TODO(Phase 6): tag a known-good demo build"
