@@ -279,7 +279,10 @@ def build_training_table(aoi_id: str = "aizawl", *, ratio: int = NEGATIVE_TO_POS
     negatives["label"] = 0
     print(f"  {len(negatives)} negative cell(s) sampled")
 
-    keep_cols = ["cell_id", "label"] + TERRAIN_FEATURE_COLUMNS
+    # centroid_lat/centroid_lon are carried through (not model features — land_cover_class/
+    # elevation/slope etc. are the actual predictors) so ml/train.py can assign spatial CV blocks
+    # without re-loading cells.gpkg itself.
+    keep_cols = ["cell_id", "label", "centroid_lat", "centroid_lon"] + TERRAIN_FEATURE_COLUMNS
     table = pd.concat([positives[keep_cols], negatives[keep_cols]], ignore_index=True)
     return table
 
