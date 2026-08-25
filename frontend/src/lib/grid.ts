@@ -18,6 +18,7 @@ import { colorForPFail } from './escalation'
 const ROW_CODES: Record<string, number> = { '40': 0, '41': 1, '42': 2 }
 const CELL_SIZE_DEG = 0.006 // ~650m at this latitude — arbitrary, for visual spacing only
 const GRID_GAP_DEG = 0.001
+const STEP_DEG = CELL_SIZE_DEG + GRID_GAP_DEG
 
 export interface CellGridPosition {
   cellId: string
@@ -36,6 +37,23 @@ export function parseStubCellId(cellId: string): CellGridPosition | null {
   const col = Number(colDigit) - 1
   if (col < 0 || col > 2) return null
   return { cellId, row, col }
+}
+
+/** The same synthetic centre point `cellRisksToFeatureCollection` places a cell's square at,
+ * exposed standalone so other synthetic-geometry consumers (e.g. lib/roads.ts's road sketch,
+ * which threads a line through a road's `contributing_cells`) can share one fabricated layout
+ * instead of each inventing its own. Returns null for any cell_id outside the Phase 0 stub
+ * convention (see parseStubCellId). */
+export function stubCellCenter(
+  cellId: string,
+  aoiCenter: { lat: number; lon: number },
+): { lat: number; lon: number } | null {
+  const pos = parseStubCellId(cellId)
+  if (!pos) return null
+  return {
+    lat: aoiCenter.lat + (1 - pos.row) * STEP_DEG,
+    lon: aoiCenter.lon + (pos.col - 1) * STEP_DEG,
+  }
 }
 
 function squarePolygon(centerLat: number, centerLon: number, sizeDeg: number): Polygon {
@@ -67,17 +85,14 @@ export function cellRisksToFeatureCollection(
   cellRisks: CellRisk[],
   aoiCenter: { lat: number; lon: number },
 ): FeatureCollection<Polygon, CellFeatureProperties> {
-  const step = CELL_SIZE_DEG + GRID_GAP_DEG
   const features: Feature<Polygon, CellFeatureProperties>[] = []
 
   for (const risk of cellRisks) {
-    const pos = parseStubCellId(risk.cell_id)
-    if (!pos) continue
-    const centerLat = aoiCenter.lat + (1 - pos.row) * step
-    const centerLon = aoiCenter.lon + (pos.col - 1) * step
+    const center = stubCellCenter(risk.cell_id, aoiCenter)
+    if (!center) continue
     features.push({
       type: 'Feature',
-      geometry: squarePolygon(centerLat, centerLon, CELL_SIZE_DEG),
+      geometry: squarePolygon(center.lat, center.lon, CELL_SIZE_DEG),
       properties: {
         cell_id: risk.cell_id,
         p_fail: risk.p_fail,
