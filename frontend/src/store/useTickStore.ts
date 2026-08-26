@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 import { api } from '../lib/api'
+import { getCitizenReports, queueCitizenReport as persistCitizenReport, type CitizenReport } from '../lib/citizenReports'
 import { cacheActionCards, getCachedActionCards } from '../lib/offlineData'
 import { connectTickSocket, type WsStatus } from '../lib/ws'
 import type {
   ActionCard,
+  Announcement,
   AoiInfo,
   AuditEvent,
   CellRisk,
@@ -12,11 +14,13 @@ import type {
   ScenarioSummary,
   SettlementPriority,
   TickResult,
+  VerificationRecord,
   VillageIsolation,
 } from '../types/schemas'
 
 const MAX_ACTION_CARDS = 20
 const MAX_AUDIT_EVENTS = 50
+const MAX_ANNOUNCEMENTS = 50
 // Generous headroom over any real scenario's frame count (aizawl-2024 is 67 frames) — this is
 // the full per-tick history of the CURRENT replay run, kept so the counterfactual scorecard
 // (BUILD_PLAN.md task 4.10) can derive "first Yellow/Orange/Red", road-severance timestamps, etc.
@@ -56,6 +60,15 @@ interface TickStoreState {
    * recommendation row, the Village View action card) all need to be able to open the SAME
    * modal (rendered once from App.tsx) at a specific alert_id. */
   auditTrailAlertId: string | null
+
+  announcements: Announcement[]
+  verificationByAlertId: Record<string, VerificationRecord>
+  citizenReports: CitizenReport[]
+
+  hydrateCitizenReports: () => void
+  queueCitizenReport: (input: Pick<CitizenReport, 'category' | 'note'>) => void
+  applyAnnouncement: (announcement: Announcement) => void
+  setVerification: (alertId: string, record: VerificationRecord) => void
 
   connect: () => void
   disconnect: () => void
@@ -99,10 +112,32 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
   scorecardOpen: false,
   auditTrailAlertId: null,
 
+  announcements: [],
+  verificationByAlertId: {},
+  citizenReports: [],
+
+  hydrateCitizenReports: () => set({ citizenReports: getCitizenReports() }),
+
+  queueCitizenReport: (input) => {
+    const report = persistCitizenReport(input)
+    set((state) => ({ citizenReports: [...state.citizenReports, report] }))
+  },
+
+  applyAnnouncement: (announcement) =>
+    set((state) => ({
+      announcements: [announcement, ...state.announcements].slice(0, MAX_ANNOUNCEMENTS),
+    })),
+
+  setVerification: (alertId, record) =>
+    set((state) => ({
+      verificationByAlertId: { ...state.verificationByAlertId, [alertId]: record },
+    })),
+
   connect: () => {
     if (disconnectSocket) return // already connected
     disconnectSocket = connectTickSocket({
       onTick: (tick) => get().applyTick(tick),
+      onAnnouncement: (announcement) => get().applyAnnouncement(announcement),
       onStatusChange: (wsStatus) => set({ wsStatus }),
     })
   },

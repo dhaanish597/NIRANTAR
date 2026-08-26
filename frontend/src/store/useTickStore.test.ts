@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../lib/api'
-import type { AuditEvent, TickResult } from '../types/schemas'
+import { queueCitizenReport } from '../lib/citizenReports'
+import type { Announcement, AuditEvent, TickResult } from '../types/schemas'
 import { useTickStore } from './useTickStore'
 
 // Only applyTick is exercised here — connect()/disconnect() open a real WebSocket, which is
@@ -177,5 +178,55 @@ describe('replayTicks (BUILD_PLAN.md task 4.10)', () => {
     useTickStore.getState().applyTick(makeTick({ mode: 'replay' }))
     useTickStore.getState().applyTick(makeTick({ mode: 'live' }))
     expect(useTickStore.getState().replayTicks).toHaveLength(1)
+  })
+})
+
+function makeAnnouncement(overrides: Partial<Announcement> = {}): Announcement {
+  return {
+    id: 'ann-1',
+    alert_id: 'a1',
+    village_id: 'v1',
+    stage: 'RED',
+    message: 'Evacuate now',
+    language: 'en',
+    issued_by: 'officer-1',
+    issued_at: '2026-01-01T00:00:00+05:30',
+    channel_results: [],
+    cap_xml: '<alert></alert>',
+    ...overrides,
+  }
+}
+
+describe('announcements / verification / citizen reports', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    useTickStore.setState({ announcements: [], verificationByAlertId: {}, citizenReports: [] })
+  })
+
+  it('applyAnnouncement prepends newest-first', () => {
+    useTickStore.getState().applyAnnouncement(makeAnnouncement({ id: 'ann-1' }))
+    useTickStore.getState().applyAnnouncement(makeAnnouncement({ id: 'ann-2' }))
+    expect(useTickStore.getState().announcements.map((a) => a.id)).toEqual(['ann-2', 'ann-1'])
+  })
+
+  it('setVerification stores a record keyed by alert_id', () => {
+    useTickStore.getState().setVerification('a1', { status: 'verified', verifiedBy: 'officer-1' })
+    expect(useTickStore.getState().verificationByAlertId['a1']).toEqual({
+      status: 'verified',
+      verifiedBy: 'officer-1',
+    })
+  })
+
+  it('queueCitizenReport updates the store and localStorage together', () => {
+    useTickStore.getState().queueCitizenReport({ category: 'Crack', note: 'test' })
+    expect(useTickStore.getState().citizenReports).toHaveLength(1)
+    expect(useTickStore.getState().citizenReports[0].source).toBe('simulated')
+  })
+
+  it('hydrateCitizenReports reads whatever is already in localStorage', () => {
+    queueCitizenReport({ category: 'Blocked road', note: 'pre-existing' })
+    useTickStore.getState().hydrateCitizenReports()
+    expect(useTickStore.getState().citizenReports).toHaveLength(1)
+    expect(useTickStore.getState().citizenReports[0].note).toBe('pre-existing')
   })
 })
