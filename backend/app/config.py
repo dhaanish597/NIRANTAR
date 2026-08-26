@@ -258,3 +258,16 @@ ACTION_CARD_CONTACT_PLACEHOLDER = (
     "District Disaster Management Authority (DDMA) control room — "
     "contact number not yet configured for this AOI (placeholder, not a real number)"
 )
+
+
+# =================================================================================================
+# pipeline.py real-module wiring (a later session, task-1.12-through-3.6's integration into the
+# live/replay pipeline — see pipeline.py's own module docstring for the full design rationale).
+# =================================================================================================
+# decision/window.py needs a chronological trajectory of `WindowObservation`s (BUILD_PLAN.md task
+# 2.6). pipeline.py maintains one AOI-level rolling history — see its module docstring's "why
+# AOI-level, not per-village" ruling — capped at this many most-recent ticks so memory stays
+# bounded across a long-running LIVE session or a many-frame REPLAY. Not itself a physically cited
+# figure; large enough to give estimate_safe_window's linear fit (WINDOW_MIN_TREND_POINTS=3
+# minimum) a stable-looking recent trend without holding an unbounded history.
+PIPELINE_EXCEEDANCE_HISTORY_LEN = 50

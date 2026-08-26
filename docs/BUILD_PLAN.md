@@ -64,6 +64,25 @@ Parallelization note: if you have ≥3 people, one owns `frontend/`, one owns `b
 **Demo Value:** the map becomes truthful. Real terrain, real rainfall, a real probability.
 **Definition of Done:** for the Aizawl AOI, a real rainfall time series drives a trained XGBoost model producing per-cell `p_fail` with SHAP attributions, and the eval report in `data/models/eval_report.md` states AUC under *spatial* block cross-validation.
 
+**2026-08-26 — `pipeline.py` wired to every real module built in Phase 1/2/3 (not a numbered task
+of its own — cross-cutting integration CLAUDE.md §11 had flagged as the outstanding "Phase 1C/2"
+gap: the live/replay pipeline was still 100% Phase-0 stubs despite every real module existing).**
+`Pipeline.process()` now calls the real `risk/model.py` (with a `risk/thresholds.py`-only
+fallback for any cell_id with no terrain match — see `pipeline.py`'s own module docstring, ruling
+2), the full `impact/` chain (runout → road risk → isolation → priority), and per-village
+`decision/escalation.py` → `decision/routing.py` → `decision/action_card.py`. Dissemination is
+deliberately NOT auto-fired (ruling 6 — human-in-the-loop). Real cell-id migration also landed
+alongside it: `data/scenarios/_smoke.json` and `aizawl-2024.json` (which share the same 9-cell
+layout) were remapped from the Phase-0 stub `aizawl_401`-style convention onto real
+`cells.gpkg` cells matching real named Aizawl villages (`frontend/src/lib/grid.ts`'s
+`REMAPPED_REAL_CELL_POSITIONS`), so both now produce genuine end-to-end village escalation and
+action cards, not just coloured cells. `_smoke.json`'s rainfall values were also redesigned (it's
+a purely synthetic fixture, free to) — the original ramp, tuned only against the Phase-0 linear
+stub formula, saturated the real multi-window I-D/E-D threshold engine from frame 0. `wayanad-2024`
+and `tupul-2022` still use the stub cell-id convention and have no registered `config.AOIS` entry
+— `pipeline.py` degrades those to risk-only ticks rather than crashing (ruling 7); closing that
+gap for them is separate, schedulable follow-up work, not blocked on anything.
+
 ### 1A. Static data (Aug 26–27)
 - [x] **1.1 (P0)** `scripts/fetch_dem.py` — Copernicus DEM 30 m (or ALOS PALSAR 12.5 m if bandwidth allows) for each AOI bounding box. Cache to `data/static/<aoi>/dem.tif`.
 - [x] **1.2 (P0)** `scripts/build_grid.py` — 500 m analysis grid clipped to AOI. For each cell compute: mean/max slope, aspect, plan & profile curvature, elevation, relief, TWI, distance to nearest fault/lineament, distance to nearest road, land-cover class, lithology class. Write `data/static/<aoi>/cells.gpkg`. *(Scope cut, documented in the script: plan/profile curvature, distance-to-fault, and lithology_class are written as explicit null columns, not computed — see CLAUDE.md §11/§12. Everything else is real and verified against the actual Aizawl output.)*
