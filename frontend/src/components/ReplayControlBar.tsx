@@ -29,6 +29,7 @@ export function ReplayControlBar() {
   const latestTick = useTickStore((s) => s.latestTick)
   const scenarios = useTickStore((s) => s.scenarios)
   const stopReplay = useTickStore((s) => s.stopReplay)
+  const openScorecard = useTickStore((s) => s.openScorecard)
 
   const mode = latestTick?.mode ?? modeState?.mode ?? 'live'
   if (mode !== 'replay') return null
@@ -83,6 +84,15 @@ export function ReplayControlBar() {
         </div>
         <span className="text-slate-500">{scenario ? scenario.id : scenarioId}</span>
       </div>
+
+      <button
+        type="button"
+        onClick={openScorecard}
+        title="BUILD_PLAN.md task 4.10: what actually happened vs. what our system produced."
+        className="rounded bg-amber-600 px-3 py-1 font-semibold text-black hover:bg-amber-500"
+      >
+        Scorecard
+      </button>
 
       <button
         type="button"

@@ -16,6 +16,11 @@ import type {
 
 const MAX_ACTION_CARDS = 20
 const MAX_AUDIT_EVENTS = 50
+// Generous headroom over any real scenario's frame count (aizawl-2024 is 67 frames) — this is
+// the full per-tick history of the CURRENT replay run, kept so the counterfactual scorecard
+// (BUILD_PLAN.md task 4.10) can derive "first Yellow/Orange/Red", road-severance timestamps, etc.
+// from real tick-by-tick data rather than only the latest snapshot.
+const MAX_REPLAY_TICKS = 2000
 
 interface TickStoreState {
   wsStatus: WsStatus
@@ -23,6 +28,11 @@ interface TickStoreState {
   scenarios: ScenarioSummary[]
   modeState: ModeState | null
   latestTick: TickResult | null
+  /** Every tick received since the most recent `startReplay()` call, in chronological order,
+   * capped at MAX_REPLAY_TICKS (BUILD_PLAN.md task 4.10's counterfactual scorecard — see
+   * `lib/scorecard.ts`). Deliberately NOT cleared on `stopReplay()` so the scorecard for a replay
+   * that just finished stays viewable after returning to LIVE. */
+  replayTicks: TickResult[]
   cellRisks: CellRisk[]
   roadRisks: RoadSegmentRisk[]
   isolations: VillageIsolation[]
@@ -34,6 +44,11 @@ interface TickStoreState {
    * (MapView) or a Priority List row (RightRail). Lives here (not component-local state) so
    * either entry point can open/close the same drawer. */
   selectedVillageId: string | null
+  /** BUILD_PLAN.md task 4.10: whether the Counterfactual Lead-Time Scorecard modal is open.
+   * Lives here (store-owned), same pattern as `selectedVillageId`, so both the trigger
+   * (ReplayControlBar) and the modal itself (CounterfactualScorecard, rendered from App.tsx) can
+   * read/set it without prop drilling. */
+  scorecardOpen: boolean
 
   connect: () => void
   disconnect: () => void
@@ -44,6 +59,8 @@ interface TickStoreState {
    * real WebSocket — see src/store/useTickStore.test.ts. */
   applyTick: (tick: TickResult) => void
   selectVillage: (villageId: string | null) => void
+  openScorecard: () => void
+  closeScorecard: () => void
 }
 
 let disconnectSocket: (() => void) | null = null
@@ -54,6 +71,7 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
   scenarios: [],
   modeState: null,
   latestTick: null,
+  replayTicks: [],
   cellRisks: [],
   roadRisks: [],
   isolations: [],
@@ -62,6 +80,7 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
   auditEvents: [],
   error: null,
   selectedVillageId: null,
+  scorecardOpen: false,
 
   connect: () => {
     if (disconnectSocket) return // already connected
@@ -92,7 +111,10 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
   startReplay: async (scenarioId: string) => {
     try {
       const modeState = await api.startReplay(scenarioId)
-      set({ modeState, error: null })
+      // A fresh replay run starts a fresh tick history — BUILD_PLAN.md task 4.7's backend note
+      // ("restart must fully reset downstream state") applies just as much to the frontend's own
+      // accumulated history the scorecard reads from.
+      set({ modeState, error: null, replayTicks: [] })
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) })
     }
@@ -116,7 +138,15 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
       priorities: tick.priorities,
       actionCards: [...tick.new_action_cards, ...state.actionCards].slice(0, MAX_ACTION_CARDS),
       auditEvents: [...tick.new_audit_events, ...state.auditEvents].slice(0, MAX_AUDIT_EVENTS),
+      // Only replay ticks feed the counterfactual scorecard (task 4.10) — a LIVE tick received
+      // while a previous replay's history is still being reviewed must not contaminate it.
+      replayTicks:
+        tick.mode === 'replay'
+          ? [...state.replayTicks, tick].slice(-MAX_REPLAY_TICKS)
+          : state.replayTicks,
     })),
 
   selectVillage: (villageId: string | null) => set({ selectedVillageId: villageId }),
+  openScorecard: () => set({ scorecardOpen: true }),
+  closeScorecard: () => set({ scorecardOpen: false }),
 }))
