@@ -12,6 +12,10 @@ BUILD_PLAN.md tasks 3.7/3.10 add POST /api/ddma/decide and POST /api/village/ack
 each route's own docstring below for the scope ruling (option (a) from each task's own choice:
 real backend wiring over `audit/producers.py`'s already-real, already-tested producer functions,
 rather than an honestly-disabled frontend stub).
+
+BUILD_PLAN.md task 5.8 adds POST /api/whatif/simulate — see that route's own docstring and
+`api/whatif.py`'s module docstring for the throwaway-Pipeline isolation and synthetic-frame
+rulings (real cell_ids, uniform rainfall, no fabricated antecedent wetness).
 """
 from __future__ import annotations
 
