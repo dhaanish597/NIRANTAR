@@ -11,7 +11,12 @@ from pydantic import BaseModel, Field
 
 from app.schemas.audit import AuditEvent
 from app.schemas.decision import ActionCard
-from app.schemas.impact import RoadSegmentRisk, SettlementPriority, VillageIsolation
+from app.schemas.impact import (
+    RoadSegmentRisk,
+    RunoutEnvelope,
+    SettlementPriority,
+    VillageIsolation,
+)
 from app.schemas.mode import RunMode
 from app.schemas.risk import CellRisk
 
@@ -22,6 +27,12 @@ class TickResult(BaseModel):
     scenario_id: str | None = None
     aoi_id: str
     cell_risks: list[CellRisk] = Field(default_factory=list)
+    # Runout envelopes reaching the frontend (BUILD_PLAN.md task 2.2/2.3 schema-change ruling):
+    # CLAUDE.md §11 flagged this as an open gap since Phase 0 — impact/stub.py computed
+    # RunoutEnvelope objects but had nowhere to put them on the wire. Resolved as a TickResult
+    # field (not a separate REST/tile endpoint) to match the existing pattern of every other
+    # impact/ output (road_risks, isolations, priorities) already being broadcast this way.
+    runouts: list[RunoutEnvelope] = Field(default_factory=list)
     road_risks: list[RoadSegmentRisk] = Field(default_factory=list)
     isolations: list[VillageIsolation] = Field(default_factory=list)
     priorities: list[SettlementPriority] = Field(default_factory=list)

@@ -233,6 +233,7 @@ class TickResult(BaseModel):
     scenario_id: str | None
     aoi_id: str
     cell_risks: list[CellRisk]
+    runouts: list[RunoutEnvelope]
     road_risks: list[RoadSegmentRisk]
     isolations: list[VillageIsolation]
     priorities: list[SettlementPriority]
@@ -240,6 +241,13 @@ class TickResult(BaseModel):
     new_audit_events: list[AuditEvent]
     is_reconstructed: bool
 ```
+
+**Schema-change note (BUILD_PLAN.md task 2.2/2.3, Phase 2):** `runouts` was added here to close a
+gap CLAUDE.md §11 had flagged since Phase 0 — `impact/stub.py` computed `RunoutEnvelope` objects
+every tick but `TickResult` had nowhere to put them, so they were silently dropped before reaching
+`/ws/ticks`. Resolved as a `TickResult` field (matching the existing pattern of every other
+`impact/` output — `road_risks`, `isolations`, `priorities` — already being broadcast this way),
+not a separate REST/tile endpoint.
 
 `TickResult` is the one object the frontend ever receives over the WebSocket. It re-exports
 (not duplicates) the types above — every field is a list of already-defined schema objects.
