@@ -1,0 +1,18 @@
+# Phase 5 offline map tiling (BUILD_PLAN.md task 5.2, scripts/build_tiles.py). Separate from
+# requirements-geo.txt/-graph.txt so these tiling-only deps aren't pulled in before Phase 5 needs
+# them - same reasoning as every other requirements-*.txt split in this repo.
+#
+# Scope ruling (documented in scripts/build_tiles.py's own module docstring too): no tippecanoe,
+# ogr2ogr, or any GDAL CLI/osgeo binding is installed or installable in this environment (checked
+# for real - `which tippecanoe`, `which ogr2ogr`, `import osgeo` all failed). Two real,
+# pip-installable pure-Python libraries cover the whole PMTiles pipeline instead of a C++ tiling
+# engine:
+#   - mapbox-vector-tile: encodes shapely geometries into a real Mapbox Vector Tile (MVT)
+#     protobuf per (z,x,y) tile, including the standard quantize-to-extent + y-flip transform.
+#   - pmtiles: the OFFICIAL protomaps Python package - `pmtiles.writer.write`/`Writer` is the
+#     exact PMTiles v3 binary writer the `pmtiles-convert` CLI itself uses, not a reimplementation.
+
+-r requirements-geo.txt
+
+mapbox-vector-tile>=2.2,<3.0
+pmtiles>=3.7,<4.0
