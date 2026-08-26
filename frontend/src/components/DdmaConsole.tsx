@@ -4,6 +4,7 @@ import { DDMA_OFFICER_ID_PLACEHOLDER, recommendationContext, type DdmaDecisionKi
 import { useTickStore } from '../store/useTickStore'
 import type { ActionCard, AuditEvent, EscalationStage } from '../types/schemas'
 import { MeshPropagationVisual } from './MeshPropagationVisual'
+import { WhatIfSimulator } from './WhatIfSimulator'
 
 interface DecisionState {
   status: 'submitting' | 'done' | 'error'
@@ -43,6 +44,12 @@ interface DecisionState {
  * View) since it's a DDMA-operational "how would this actually reach people" concern, not a
  * citizen-facing screen. See that component's own docstring for the real-parameters-but-
  * simulated-outcome data-source ruling.
+ *
+ * BUILD_PLAN.md task 5.8 addition (this session): `WhatIfSimulator` below that — a real rainfall
+ * slider that calls `POST /api/whatif/simulate` and re-runs the REAL pipeline over hypothetical
+ * rainfall (see `backend/app/api/whatif.py`'s own module docstring for the synthetic-frame
+ * rulings). Deliberately renders from its own local state, never through `useTickStore` — a
+ * what-if result must never be confused with, or silently override, real live/replay map state.
  */
 export function DdmaConsole({ onBack }: { onBack: () => void }) {
   const actionCards = useTickStore((s) => s.actionCards)
@@ -115,6 +122,12 @@ export function DdmaConsole({ onBack }: { onBack: () => void }) {
           see MeshPropagationVisual.tsx for the real-parameters-but-simulated-outcome ruling. */}
       <div className="mb-6 rounded border border-white/10 bg-white/5 p-4">
         <MeshPropagationVisual />
+      </div>
+
+      {/* BUILD_PLAN.md task 5.8: what-if rainfall simulator — a REAL pipeline run over
+          hypothetical rainfall, DDMA pre-positioning support, never a real alert. */}
+      <div className="mb-6 rounded border border-white/10 bg-white/5 p-4">
+        <WhatIfSimulator />
       </div>
 
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">

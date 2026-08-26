@@ -20,14 +20,19 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from app.api.whatif import WhatIfRequest, WhatIfResult, build_synthetic_frame
 from app.audit.producers import record_ddma_decision, record_village_acknowledged
 from app.config import AOIS
+from app.config import get_aoi as get_aoi_config  # aliased: this module's OWN `/api/aoi/{id}`
+# route below is itself named `get_aoi` — importing app.config's function under its real name
+# would silently shadow that route function at module scope.
 from app.core.clock import LiveClock
 from app.core.mode import ModeError
 from app.ingest.factory import SCENARIOS_DIR, UnknownScenarioError, load_scenario_or_raise
+from app.pipeline import Pipeline
 from app.schemas.audit import AuditEvent
 from app.schemas.decision import ActionCard
-from app.schemas.mode import ModeState
+from app.schemas.mode import ModeState, RunMode
 
 router = APIRouter(prefix="/api")
 
@@ -225,3 +230,42 @@ async def village_acknowledge(body: VillageAcknowledgeRequest, request: Request)
         village_id=body.village_id,
         t=LiveClock().now(),
     )
+
+
+@router.post("/whatif/simulate")
+async def whatif_simulate(body: WhatIfRequest) -> WhatIfResult:
+    """BUILD_PLAN.md task 5.8 — the what-if rainfall simulator: DDMA PRE-POSITIONING SUPPORT, not
+    a real alert. "A rainfall slider ('simulate 250 mm over 12 h') that re-runs the pipeline on
+    synthetic input and shows the resulting failure distribution, road severance and isolation
+    cascade."
+
+    Deliberately takes NO `Request`/`AppState` parameter — unlike `ddma_decide`/
+    `village_acknowledge` above, this must NOT touch `app_state.pipeline` (the real, live audit
+    hash chain) or `app_state.bus` (which would otherwise push a synthetic tick out over
+    `/ws/ticks` as if it were real). A brand-new, throwaway `Pipeline()` is constructed and
+    discarded for this one call — its own throwaway `AuditLog`/`EscalationStateMachine` are never
+    referenced again once the response is returned, so nothing this produces is ever visible via
+    `GET /api/audit/{alert_id}` or any live tick stream. See `api/whatif.py`'s own module
+    docstring for the synthetic-frame construction rulings (real cell_ids, uniform rainfall, no
+    fabricated antecedent wetness).
+
+    `aoi_id` not registered / no static terrain grid built for it yet -> 404 (not a silent
+    risk-only degrade, unlike `pipeline.py`'s own ruling 7 for a live/replay tick — a DDMA officer
+    staring at an empty what-if result for an AOI that simply has no data would be misleading;
+    failing loudly here is the honest choice for an on-demand exploratory tool).
+    """
+    try:
+        get_aoi_config(body.aoi_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    t = LiveClock().now()
+    try:
+        frame = build_synthetic_frame(body.aoi_id, body.rainfall_mm, body.duration_hours, t=t)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    pipeline = Pipeline()  # throwaway — see docstring above
+    tick = pipeline.process(frame, mode=RunMode.LIVE, scenario_id=None)
+
+    return WhatIfResult(request=body, cell_count=len(frame.cells), tick=tick)

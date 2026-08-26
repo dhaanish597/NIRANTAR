@@ -1,4 +1,12 @@
-import type { ActionCard, AoiInfo, AuditEvent, ModeState, ScenarioSummary } from '../types/schemas'
+import type {
+  ActionCard,
+  AoiInfo,
+  AuditEvent,
+  ModeState,
+  ScenarioSummary,
+  WhatIfRequest,
+  WhatIfResult,
+} from '../types/schemas'
 import type { DdmaDecisionKind } from './ddma'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
@@ -47,4 +55,11 @@ export const api = {
   // BUILD_PLAN.md task 3.8: the Audit Trail view's real data source.
   getAuditTrail: (alertId: string) =>
     request<AuditEvent[]>(`/api/audit/${encodeURIComponent(alertId)}`),
+  // BUILD_PLAN.md task 5.8: the what-if rainfall simulator — a real TickResult from a throwaway
+  // backend Pipeline run (never the live one), DDMA pre-positioning support, not a real alert.
+  runWhatIf: (payload: WhatIfRequest) =>
+    request<WhatIfResult>('/api/whatif/simulate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 }

@@ -141,3 +141,20 @@ export interface AoiInfo {
   center: { lat: number; lon: number }
   note?: string
 }
+
+/** BUILD_PLAN.md task 5.8 — POST /api/whatif/simulate's request body
+ * (backend/app/api/whatif.py::WhatIfRequest). */
+export interface WhatIfRequest {
+  aoi_id: string
+  rainfall_mm: number
+  duration_hours: number
+}
+
+/** POST /api/whatif/simulate's response (backend/app/api/whatif.py::WhatIfResult) — a REAL
+ * TickResult from a throwaway Pipeline run, never written to the live audit log or /ws/ticks. */
+export interface WhatIfResult {
+  request: WhatIfRequest
+  assumptions: string[]
+  cell_count: number
+  tick: TickResult
+}
