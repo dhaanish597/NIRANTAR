@@ -328,11 +328,19 @@ def backfill_history(
     t = start
     while t <= end:
         if t.replace(tzinfo=timezone.utc) not in already_covered:
-            granule_path = download_granule(t, username, password, cache_dir)
-            rows = read_granule_precip_mm(granule_path, aoi.bbox)
-            if not rows.empty:
-                append_timeseries(rows, t, store_path)
-            fetched += 1
+            try:
+                granule_path = download_granule(t, username, password, cache_dir)
+                rows = read_granule_precip_mm(granule_path, aoi.bbox)
+                if not rows.empty:
+                    append_timeseries(rows, t, store_path)
+                fetched += 1
+            except requests.HTTPError as exc:
+                if exc.response is not None and exc.response.status_code == 404:
+                    print(
+                        f"Granule for {t.isoformat()} not yet published on GES DISC (IMERG ~4h latency); skipping."
+                    )
+                else:
+                    raise
         t += timedelta(minutes=IMERG_GRANULE_MINUTES)
     return fetched
 

@@ -12,22 +12,11 @@ Check items off as you do them; delete the file (or the section) once it's empty
       `EARTHDATA_PASSWORD`. **Note:** they were briefly pasted into `.env.example` (the tracked
       template) instead of `.env` — caught before it was committed, `.env.example` has been
       reverted to empty placeholders, real values moved to `.env`. No leak reached git history.
-- [ ] **Authorize the "GES DISC" application on your Earthdata profile — blocks task 1.6 for
-      real.** `ingest/live/imerg.py` is written and unit-tested, but every real granule-download
-      attempt this session got back NASA's generic GES DISC web-app shell (HTTP 200, HTML, not
-      the actual HDF5 file) instead of data — confirmed by actually downloading it and inspecting
-      the bytes, not assumed. This is a well-documented NASA Earthdata gotcha (Earthdata Forum:
-      *"you need to authorize the application... approve all the apps containing the word
-      GESDISC"*) — logging in once does NOT automatically grant every DAAC's data archive access;
-      each one needs a one-time explicit approval on your account. **Fix:** log into
-      https://urs.earthdata.nasa.gov/profile/applications (or the "Applications" tab of your
-      Earthdata profile) with the credentials already in `.env`, and approve/authorize anything
-      with "GESDISC" or "GES DISC" in the name. Then re-run
-      `python -m app.ingest.live.imerg --aoi aizawl --backfill-hours 1` (from `backend/`, venv
-      active) — it should download a real granule instead of raising the "not an HDF5 file"
-      error. **This will very likely also block task 1.7 (SMAP)** the same way, since SMAP is
-      also GES DISC/NSIDC-hosted — worth checking the same profile page covers it, or expect to
-      repeat this exact dance for task 1.7.
+- [x] **Authorize the "GES DISC" application on your Earthdata profile — task 1.6 verified.**
+      Done — app authorized on Earthdata, authenticated downloads from `gpm1.gesdisc.eosdis.nasa.gov`
+      now succeed and real 8 MB HDF5 granules are downloaded, cached, and parsed into pixel
+      time-series. Graceful skipping of unreleased near-real-time granules within IMERG's ~4h latency
+      window added to `imerg.py`.
 - [ ] **IMD public API access** (`api.imd.gov.in`) — task 1.8. BUILD_PLAN.md already flags this:
       *"Expect IP-whitelisting friction."* Start the request now, not when task 1.8 comes up —
       it's supplementary to IMERG (circuit-broken, not on the critical path) so Phase 1 isn't

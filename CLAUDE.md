@@ -310,27 +310,30 @@ make freeze                 # tag a known-good demo build
     mode-aware location, but flagging the addition since it wasn't literally named before.
   - `backend/app/config.py` now exists (Phase 1 needed it for AOI bounding boxes — see session
     log). `api/routes.py`'s `/api/aoi/{id}` now reads from it instead of its own duplicate dict.
-- **External access still needed** (see `Required_by_me.md`): the Earthdata *account* exists but
-  its **GES DISC application isn't authorized yet** — a real, confirmed blocker for task 1.6's
-  live-download path (see task 1.6 note above), fixed by one click in the Earthdata profile UI,
-  likely needed again for task 1.7 (SMAP). IMD API access not yet requested (blocks 1.8, P1,
-  circuit-broken so not critical path). GSI Bhukosh (task 1.4) deliberately deprioritized — see
-  BUILD_PLAN.md, it now blocks nothing until task 1.15. Docker Desktop is running.
-- **Known blockers:** task 1.6's real-download verification is blocked on the GES DISC
-  authorization above — everything else about the adapter (URL construction, parsing logic,
-  cell-to-pixel mapping) is written and tested. Nothing else blocks Phase 1's P0 critical path.
-- **Next action:** once GES DISC is authorized, re-run
-  `python -m app.ingest.live.imerg --aoi aizawl --backfill-hours 6` (from `backend/`) to verify
-  the real HDF5 parsing against genuine bytes for the first time — fix `_read_granule_precip` if
-  the real structure differs from the documented spec it was written against. Otherwise, task 1.7
-  (`ingest/live/smap.py`) or task 1.12 (`ml/build_inventory.py`, COOLR CSV already exists) are the
-  natural next tasks not blocked by that.
+- **External access still needed** (see `Required_by_me.md`): NASA Earthdata account + GES DISC
+  authorization are now COMPLETE and verified against real live downloads. IMD API access not yet requested
+  (blocks 1.8, P1, circuit-broken so not critical path). GSI Bhukosh (task 1.4) deliberately deprioritized.
+- **Known blockers:** None for Phase 1's P0 critical path.
+- **Next action:** task 1.7 (`ingest/live/smap.py`) or task 1.12 (`ml/build_inventory.py`, COOLR CSV already exists).
 
 ---
 
 ## 12. Session Log
 
 > Newest entry at the top. One entry per session. Keep each to ~5 lines.
+
+### 2026-08-25 — Session 3
+
+- **Did:** Verified user authorized `NASA GESDISC DATA ARCHIVE` in Earthdata. Identified that
+  `imerg.py` was raising 404 on the most recent 1-hour backfill because NASA IMERG Early has a real-world
+  ~4-hour publication delay. Added graceful 404 handling for unreleased near-realtime granules in
+  `backfill_history()`. Verified real authenticated download of genuine 8.08 MB NASA HDF5 granules
+  (`3B-HHR-E.MS.MRG.3IMERG...V07C.HDF5`), HDF5 grid precipitation extraction, and rolling feature calculation
+  for Aizawl. All 365 backend tests passing. Checked off task 1.6 and GES DISC in `Required_by_me.md`.
+- **Broke / discovered:** NASA IMERG Early run publishes every 30m but with ~4h latency; requesting
+  granules within the last 4 hours returns HTTP 404 as expected. Gracefully skipping unreleased granules
+  allows backfill to succeed cleanly up to the latest available satellite pass.
+- **Next:** Proceed with task 1.7 (`ingest/live/smap.py`) or task 1.12 (`ml/build_inventory.py`).
 
 ### 2026-08-25 — Session 2
 
