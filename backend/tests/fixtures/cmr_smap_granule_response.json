@@ -1,0 +1,35 @@
+{
+  "_fixture_note": "Synthetic-but-realistic CMR granules.json response (task 1.10), shaped to the real ATOM-derived feed.entry[].links[] structure documented at https://cmr.earthdata.nasa.gov/search/site/docs/search/api.html and the ESIP FedSearch rel-URI convention (rel ending '/data#' = direct HTTPS download link), both fetched and read in this session (see smap.py's module docstring). The granule id/title/href below are plausible per the NSIDC SPL3SMP_E file-naming convention (User Guide Table 3) but not copied from a real CMR response byte-for-byte (real network access to cmr.earthdata.nasa.gov was blocked in this environment). This key itself is not real CMR output and is skipped by the parser (extract_data_download_url only reads feed.entry[].links[]).",
+  "feed": {
+    "updated": "2026-08-26T00:00:00.000Z",
+    "id": "https://cmr.earthdata.nasa.gov/search/granules.json?short_name=SPL3SMP_E&version=006",
+    "title": "ECHO granule metadata",
+    "entry": [
+      {
+        "id": "G0000000001-NSIDC_ECS",
+        "title": "SMAP_L3_SM_P_E_20260825_R19240_001",
+        "time_start": "2026-08-25T00:00:00.000Z",
+        "time_end": "2026-08-25T23:59:59.000Z",
+        "collection_concept_id": "C0000000001-NSIDC_ECS",
+        "data_center": "NSIDC_ECS",
+        "links": [
+          {
+            "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+            "hreflang": "en-US",
+            "href": "https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.006/2026.08.25/SMAP_L3_SM_P_E_20260825_R19240_001.h5"
+          },
+          {
+            "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+            "hreflang": "en-US",
+            "href": "https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.006/2026.08.25/SMAP_L3_SM_P_E_20260825_R19240_001.h5.xml"
+          },
+          {
+            "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+            "hreflang": "en-US",
+            "href": "https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.006/2026.08.25/SMAP_L3_SM_P_E_20260825_R19240_001.jpg"
+          }
+        ]
+      }
+    ]
+  }
+}
