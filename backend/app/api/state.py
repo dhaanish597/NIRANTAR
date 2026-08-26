@@ -37,10 +37,48 @@ class AppState:
         self.pipeline = Pipeline()
         self._realtime = realtime
         self._task: asyncio.Task | None = None
+        # The currently in-flight DataSource — kept so pause()/resume()/set_speed() (BUILD_PLAN.md
+        # task 4.7's replay controls, exposed over REST by this session's small connected gap) can
+        # act on the SAME live ScenarioSource `_run`'s `async for frame in source.frames()` is
+        # actually iterating, without restarting the tick task. Restarting via
+        # `_restart_tick_task()` would call `build_clock_and_source()` again, which builds a BRAND
+        # NEW ScenarioClock/ScenarioSource from the scenario's own start time — exactly the "no
+        # residue" reset `start_replay()` deliberately wants on a genuine restart, but the WRONG
+        # behaviour for a pause/resume/speed change, which must act on the replay already in
+        # progress rather than silently rewinding it to frame zero.
+        self._current_source: DataSource | None = None
 
     def start(self) -> None:
         """Begin the LIVE stub tick stream. Call once, from inside a running event loop."""
         self._restart_tick_task()
+
+    async def pause_replay(self) -> None:
+        """BUILD_PLAN.md task 4.7 / this session's small connected gap: pause the IN-PROGRESS
+        replay. `self.mode.pause()` raises `ModeError` if not currently in REPLAY — that gate runs
+        BEFORE touching `self._current_source`, so a LIVE-mode caller never reaches the source at
+        all. `ScenarioSource.pause()` (task 4.7, already real) makes `frames()` block via its
+        internal `asyncio.Event` before yielding the next frame, without ending iteration.
+        """
+        await self.mode.pause()
+        if hasattr(self._current_source, "pause"):
+            self._current_source.pause()
+
+    async def resume_replay(self) -> None:
+        await self.mode.resume()
+        if hasattr(self._current_source, "resume"):
+            self._current_source.resume()
+
+    async def set_replay_speed(self, speed_factor: float) -> None:
+        """Updates BOTH `ModeState.speed_factor` (`self.mode.set_speed` — what `GET /api/state`
+        and the frontend's `modeState.speed_factor` display, per task 4.9's already-built control
+        bar) AND the live `ScenarioSource`'s own clock (`ScenarioSource.set_speed`, task 4.7 —
+        `frames()` re-reads `clock.speed_factor` fresh every iteration, so this takes effect on
+        the very next frame's pacing, no restart needed). `self.mode.set_speed` raises `ModeError`/
+        `ValueError` first (not in REPLAY / non-positive factor) before either is touched.
+        """
+        await self.mode.set_speed(speed_factor)
+        if hasattr(self._current_source, "set_speed"):
+            self._current_source.set_speed(speed_factor)
 
     async def start_replay(self, scenario_id: str) -> None:
         scenario = load_scenario_or_raise(scenario_id)  # raises UnknownScenarioError if missing
@@ -83,6 +121,10 @@ class AppState:
         # reset was meant to protect. Binding `pipeline` here, once, closes that race exactly the
         # way mode_at_start/scenario_id_at_start/clock/source already do.
         pipeline = self.pipeline
+        # See the class docstring's note on `self._current_source`: this must point at the exact
+        # `source` object `_run` below is about to iterate, so a pause()/resume()/set_speed() call
+        # made from another coroutine while `_run` is mid-iteration reaches the right instance.
+        self._current_source = source
         logger.info("tick loop starting: mode=%s scenario=%s", mode_at_start, scenario_id_at_start)
 
         new_task = asyncio.create_task(
