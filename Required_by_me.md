@@ -1,97 +1,71 @@
 # Required by me — things only you can do
 
-Phase 0 itself is **done and verified** — nothing below blocks calling Phase 0 complete. This is
-a punch-list for what to do *before/while* Phase 1 gets going, split by how urgent it actually is.
-Check items off as you do them; delete the file (or the section) once it's empty.
+Phases 0 and most of Phases 1–5's independently-buildable tasks are done and verified (see
+BUILD_PLAN.md's checkboxes and CLAUDE.md §11/§12 for the full state). This file only tracks what
+is genuinely stuck on YOU — an external account, a portal registration, a decision that's yours,
+or a physical action. Everything else keeps moving in parallel regardless of these.
+
+**Nothing below blocks the current work.** Check items off as you do them.
 
 ---
 
-## Before Phase 1 can really start (do these first — they have lead time)
+## Genuinely time-sensitive (start these when you have a few minutes — they have real lead time)
 
-- [x] **NASA Earthdata account** — done, credentials are set in `.env` as `EARTHDATA_USERNAME` /
-      `EARTHDATA_PASSWORD`. **Note:** they were briefly pasted into `.env.example` (the tracked
-      template) instead of `.env` — caught before it was committed, `.env.example` has been
-      reverted to empty placeholders, real values moved to `.env`. No leak reached git history.
-- [x] **Authorize the "GES DISC" application on your Earthdata profile — task 1.6 verified.**
-      Done — app authorized on Earthdata, authenticated downloads from `gpm1.gesdisc.eosdis.nasa.gov`
-      now succeed and real 8 MB HDF5 granules are downloaded, cached, and parsed into pixel
-      time-series. Graceful skipping of unreleased near-real-time granules within IMERG's ~4h latency
-      window added to `imerg.py`.
-- [ ] **IMD public API access** (`api.imd.gov.in`) — task 1.8. BUILD_PLAN.md already flags this:
-      *"Expect IP-whitelisting friction."* Start the request now, not when task 1.8 comes up —
-      it's supplementary to IMERG (circuit-broken, not on the critical path) so Phase 1 isn't
-      blocked waiting on it, but it'll be wasted if left until the last minute. Put the key in
-      `.env` as `IMD_API_KEY` once you have it.
-- [ ] **GSI Bhukosh access** for lithology/geology data (task 1.4 — now deliberately scheduled
-      last in Phase 1, not urgent; see BUILD_PLAN.md's 2026-08-25 note on task 1.4). Still worth
-      doing whenever you have a spare few minutes since it has real lead time, just no longer
-      blocking anything soon. I couldn't get
-      further than public search results: `bhukosh.gsi.gov.in/Bhukosh/Public` refused the
-      connection outright when I tried to fetch it (not a timeout — likely rate-limited or
-      network-sensitive to automated fetchers), so I can't confirm the exact registration steps
-      myself. What's confirmed from search: it distinguishes "GSI Employee" vs. "External User"
-      login, and GSI publishes a "Bhukosh Unified Download Reference Guide V 2.0" PDF + tutorial
-      videos for the shapefile download flow. Also worth checking `bhusanket.gsi.gov.in` — a
-      newer, separate GSI public portal specifically for the Landslide Forecast Bulletin /
-      landslide hazard section, which may have the field-validated inventory more directly than
-      Bhukosh proper. Register as an External User on one or both, in a real browser — TODO(verify)
-      on exact fields / approval turnaround, that needs you, not me. If a bulk export comes
-      through, same pattern as COOLR above: commit it as a small static file, don't script against
-      a live endpoint. If it doesn't come through in time, the plan already has a fallback
-      (`source: "coarse_fallback"`, labelled honestly rather than presented as high-resolution) —
-      so this is worth attempting but isn't a hard blocker.
-- [x] **NASA COOLR / Global Landslide Catalog — manual browser export (task 1.12)**. Done —
-      `data/static/COOLR_Reports_Points.csv` exists (14,963 rows, 9.4 MB). **Two things to
-      decide, both mine to flag not to silently choose:**
-      1. It's the **global** COOLR table, not India/NER-filtered — the portal's "Location: India"
-         facet only filtered which *catalog items* were listed, not the records inside the one
-         you exported. Only 177 of 14,963 rows have `country_code == "IN"`; NER-specific will be
-         fewer still. `ml/build_inventory.py` (still unwritten) needs to do this filtering itself
-         — that's normal, not a redo, just noting the raw file is global-scope.
-      2. It currently falls under `.gitignore`'s `data/static/*` rule (confirmed with
-         `git check-ignore`), so it won't get committed as-is. CLAUDE.md rule 15 commits "small
-         vector files" as an exception to that — 9.4 MB global is borderline, but the India/NER
-         subset after task 1.12's filtering would be a genuinely small file worth committing
-         (it's not re-fetchable by a script the way the DEM/WorldCover tiles are — it required
-         this manual login+export dance, so losing it means repeating today's work). Recommend:
-         keep the raw global CSV gitignored as a local cache, commit only the filtered India/NER
-         output. Confirm you're fine with that when 1.12 gets written.
-      Schema check: the CSV does carry `event_import_source` (values like `GLC`, `SMMML`, etc.) —
-      confirms COOLR's "Reports" table already folds in NASA's curated Global Landslide Catalog
-      entries alongside citizen reports, so nothing was missed by there being no separate
-      "Events" layer in that portal group.
-
-## Verify before Phase 1 needs it
-
-- [x] **Start Docker Desktop.** Done — re-verified myself: `docker compose up -d postgis`
-      succeeded, `nirantar_postgis` container is `Up ... (healthy)` on port 5432. Task 1.5
-      (`scripts/load_db.py`) is now actually unblocked.
-- [ ] *(minor, workaround already noted)* `make up` itself throws a `docker` CLI arg-parsing
-      error (`unknown shorthand flag: 'd' in -d`) on this machine specifically — reproducible via
-      MSYS make's recipe shell but not when running the identical command directly in Bash. Looks
-      like a mismatch between this machine's separately-installed MSYS2 (`make.exe`) and
-      Git-for-Windows' bundled MSYS (`sh.exe`/`bash.exe`), not a project bug. Workaround: run
-      `docker compose up -d postgis` directly instead of `make up` until/unless you want to chase
-      the toolchain mismatch itself — didn't seem worth the time relative to actual Phase 1 work.
+- [ ] **IMD public API access** (`api.imd.gov.in`) — task 1.8. `ingest/live/imd.py` is now
+      written and unit-tested (34 tests, real endpoint paths confirmed against IMD's own public
+      `api_reference.html`, wrapped in a circuit breaker so its absence never stalls the
+      pipeline) — the only thing missing is a real key to verify the live path against. Expect
+      IP-whitelisting friction (BUILD_PLAN.md already flags this). Put the key in `.env` as
+      `IMD_API_KEY` once you have it, then re-run `python -m app.ingest.live.imd --aoi aizawl`
+      (from `backend/`) to confirm the real auth-header assumption in `build_auth_headers()` —
+      that one field name is the single genuinely-unconfirmed guess in the module. Supplementary,
+      not on the critical path — nothing is waiting on this.
+- [ ] **GSI Bhukosh access** for lithology/geology data (task 1.4 — deliberately scheduled last
+      in Phase 1, still not urgent). Unchanged from before: `bhukosh.gsi.gov.in/Bhukosh/Public`
+      refused an automated connection outright, so registration steps are unconfirmed from this
+      end. Also worth checking `bhusanket.gsi.gov.in`. If a bulk export comes through, commit it
+      as a small static file (same pattern as the COOLR CSV). If it doesn't come through in time,
+      the documented `coarse_fallback` path is fine — this has a real fallback, so it's worth
+      attempting but isn't a hard blocker. `ml/train.py`'s trained model already carries
+      `lithology_class` as an explicit missing feature ready to use the moment this lands, with a
+      documented retrain step — no code changes needed when it does.
+- [ ] **NASA SMAP real-download verification (task 1.7) may need its own separate Earthdata
+      step**, not automatically covered by task 1.6's GES DISC authorization. `ingest/live/smap.py`
+      is written and unit-tested (30 tests against a real NSIDC v5 User Guide-verified product
+      structure) — real verification is blocked because this session's environment couldn't open
+      a TCP connection to `n5eil01u.ecs.nsidc.org` at all (stricter than task 1.6's original
+      session, which at least reached GES DISC). Worth checking whether your Earthdata profile's
+      Applications tab needs a separate "NSIDC DAAC" (not just "GESDISC") authorization the same
+      way GES DISC did — genuinely unconfirmed, not assumed either way.
 
 ## Your call, not mine
 
-- [ ] **Git branching strategy going forward.** Phase 0 was committed straight to `main` — there
-      was no history to protect yet, so that was the obvious default. BUILD_PLAN.md's
-      parallelization note says once ≥3 people are working (one on `frontend/`, one on
-      `backend/risk`+`ml/`, one on `backend/impact`+`backend/decision`), the schemas are what
-      let that happen safely. Decide now whether Phase 1 onward moves to feature branches / PRs,
-      or stays on `main` — I'll follow whatever you pick, but I won't invent a branching policy
-      you didn't ask for.
-- [ ] **Skim the "known gaps" list in `CLAUDE.md` §11** (`RunoutEnvelope` not on `TickResult` yet,
-      `MapView`'s deliberately-no-basemap style, synthetic cell geometry, the new
-      `ingest/factory.py` file). None of these need fixing right now, but Phase 2's impact work
-      in particular will run into the `RunoutEnvelope` gap directly — worth having an opinion on
-      it before that phase starts rather than discovering it mid-task.
+- [ ] **Git branching strategy.** Still undecided by you, but in practice this session (and the
+      large parallel-subagent session after it) has continued committing straight to `main` out
+      of necessity — every worktree-isolated subagent's branch gets merged back to `main`
+      directly once reviewed, since no feature-branch/PR policy was ever chosen. If you want that
+      to change for what's left of the build (Phase 3's remaining UI, Phase 5 polish, Phase 6),
+      say so; otherwise this is now the de facto convention, not just a default.
+- [ ] **Aeroplane-mode rehearsal (task 5.4)** will need you at the actual demo laptop at some
+      point before the freeze — physically disabling networking and running a full replay is not
+      something I can do remotely. Not urgent yet; flagging so it's on your radar before Phase 6.
+- [ ] **Phase 6 in general** (demo script content, freeze/tag timing, which judge questions get
+      rehearsed, the actual submission) is yours by design — CLAUDE.md's rule against trading
+      honesty for demo polish means none of those are mine to decide unilaterally.
 
-## Optional convenience (skip if you don't care)
+## Resolved since the last version of this file (informational, not actionable)
 
-- [ ] **Put `make` on PATH.** It's installed via MSYS2 at `C:\msys64\usr\bin\make.exe` but isn't
-      on PATH in this environment, so I've been invoking it by full path. Add that directory to
-      PATH (or add a shim) if you want to just type `make dev` / `make test` yourself without the
-      full path.
+- The `RunoutEnvelope`/`TickResult` schema gap this file used to flag under "known gaps" is
+  fixed — `runouts` is now a real field, populated by the real impact pipeline.
+- `pipeline.py` is now wired to every real risk/impact/decision module built this session (was
+  100% Phase-0 stubs before). A real, non-trivial limitation surfaced while doing that and is
+  now **mostly** fixed, not just flagged: LIVE mode and two of the four replay scenarios
+  (`wayanad-2024`, `tupul-2022`) still use `aoi_id`s with no registered `config.AOIS` entry or
+  built Phase-2 static data (a pre-existing, already-documented gap from when those scenarios
+  were built) — for those, `pipeline.py` degrades gracefully to risk-only ticks rather than
+  crashing, but real village-level escalation/action-cards don't fire. `_smoke.json` and
+  `aizawl-2024.json` (which share the same 9-cell layout) were remapped this session onto real
+  `cells.gpkg` cells matching real named villages, so the primary case-study scenario now
+  produces genuine end-to-end village escalation and action cards. Standing up Wayanad/Tupul's
+  own AOI static data (DEM/grid/exposure/road-graph, all public/no-auth) is real future work but
+  not blocked on you — it's schedulable like any other READY task.
