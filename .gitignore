@@ -35,10 +35,19 @@ Thumbs.db
 # data/scenarios is intentionally NOT ignored — scenario JSON is committed (CLAUDE.md rule 15).
 data/static/*
 !data/static/.gitkeep
+# ml/build_inventory.py's filtered India/NER COOLR subset (task 1.12) — small (~500 rows), not
+# re-fetchable by any script (the raw global CSV it's derived from needed a manual Earthdata
+# portal export), so it's the "small vector file" exception CLAUDE.md rule 15 allows. The raw
+# global COOLR CSV itself stays gitignored by the blanket data/static/* rule above.
+!data/static/ner_inventory.csv
 data/osm/*
 !data/osm/.gitkeep
 data/models/*
 !data/models/.gitkeep
+# ml/evaluate.py's eval report (task 1.16) — the document BUILD_PLAN.md's Phase 1 DoD says to
+# "hand a geologist judge"; small markdown text, not a trained-model binary, so it's committed
+# like data/scenarios rather than gitignored like the model artifacts it summarizes.
+!data/models/eval_report.md
 data/tiles/*
 !data/tiles/.gitkeep
 
