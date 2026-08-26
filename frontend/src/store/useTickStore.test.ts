@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { api } from '../lib/api'
 import type { AuditEvent, TickResult } from '../types/schemas'
 import { useTickStore } from './useTickStore'
 
@@ -40,6 +41,7 @@ function makeAuditEvent(eventId: string): AuditEvent {
 beforeEach(() => {
   useTickStore.setState({
     latestTick: null,
+    replayTicks: [],
     cellRisks: [],
     roadRisks: [],
     isolations: [],
@@ -47,6 +49,7 @@ beforeEach(() => {
     actionCards: [],
     auditEvents: [],
     selectedVillageId: null,
+    scorecardOpen: false,
   })
 })
 
@@ -128,5 +131,51 @@ describe('selectVillage', () => {
     expect(useTickStore.getState().selectedVillageId).toBe('v1')
     useTickStore.getState().selectVillage(null)
     expect(useTickStore.getState().selectedVillageId).toBeNull()
+  })
+})
+
+describe('openScorecard / closeScorecard', () => {
+  it('sets and clears scorecardOpen', () => {
+    useTickStore.getState().openScorecard()
+    expect(useTickStore.getState().scorecardOpen).toBe(true)
+    useTickStore.getState().closeScorecard()
+    expect(useTickStore.getState().scorecardOpen).toBe(false)
+  })
+})
+
+describe('replayTicks (BUILD_PLAN.md task 4.10)', () => {
+  it('accumulates replay ticks in order, but ignores live ticks', () => {
+    const replayTick1 = makeTick({ t: '2025-01-01T00:00:00+05:30', mode: 'replay' })
+    const liveTick = makeTick({ t: '2025-01-01T00:30:00+05:30', mode: 'live' })
+    const replayTick2 = makeTick({ t: '2025-01-01T01:00:00+05:30', mode: 'replay' })
+
+    useTickStore.getState().applyTick(replayTick1)
+    useTickStore.getState().applyTick(liveTick)
+    useTickStore.getState().applyTick(replayTick2)
+
+    const ticks = useTickStore.getState().replayTicks
+    expect(ticks.map((t) => t.t)).toEqual(['2025-01-01T00:00:00+05:30', '2025-01-01T01:00:00+05:30'])
+  })
+
+  it('startReplay resets replayTicks so a new run starts with no residue from the last one', async () => {
+    useTickStore.getState().applyTick(makeTick({ mode: 'replay' }))
+    expect(useTickStore.getState().replayTicks).toHaveLength(1)
+
+    const spy = vi.spyOn(api, 'startReplay').mockResolvedValue({
+      mode: 'replay',
+      scenario_id: '_smoke',
+      scenario_time: null,
+      speed_factor: 1,
+      paused: false,
+    })
+    await useTickStore.getState().startReplay('_smoke')
+    expect(useTickStore.getState().replayTicks).toHaveLength(0)
+    spy.mockRestore()
+  })
+
+  it('does not clear replayTicks on a live tick after a replay run (scorecard stays viewable)', () => {
+    useTickStore.getState().applyTick(makeTick({ mode: 'replay' }))
+    useTickStore.getState().applyTick(makeTick({ mode: 'live' }))
+    expect(useTickStore.getState().replayTicks).toHaveLength(1)
   })
 })

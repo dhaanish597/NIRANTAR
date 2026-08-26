@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
+import { CounterfactualScorecard } from './components/CounterfactualScorecard'
+import { InstallPrompt } from './components/InstallPrompt'
 import { MapView } from './components/MapView'
 import { ModeBanner } from './components/ModeBanner'
+import { OnboardingOverlay } from './components/OnboardingOverlay'
 import { ReplayControlBar } from './components/ReplayControlBar'
 import { RightRail } from './components/RightRail'
 import { ScenarioPickerModal } from './components/ScenarioPickerModal'
@@ -48,12 +51,15 @@ function App() {
               {error}
             </div>
           )}
+          <InstallPrompt />
         </div>
         <RightRail />
       </div>
       <ReplayControlBar />
       <ScenarioPickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} />
       <VillageDetailDrawer />
+      <CounterfactualScorecard />
+      <OnboardingOverlay />
     </div>
   )
 }

@@ -1,6 +1,8 @@
 import { mergeVillageDisplay, type VillageDisplayRecord } from '../lib/priorityDetail'
 import { useTickStore } from '../store/useTickStore'
 import type { ActionCard, EscalationStage } from '../types/schemas'
+import { ExplainabilityPanel } from './ExplainabilityPanel'
+import { FalseAlarmSlider } from './FalseAlarmSlider'
 
 export function RightRail() {
   const priorities = useTickStore((s) => s.priorities)
@@ -36,6 +38,13 @@ export function RightRail() {
         {!latestCard && <p className="text-sm text-slate-500">No action card issued yet.</p>}
         {latestCard && <ActionCardView card={latestCard} />}
       </section>
+
+      {/* BUILD_PLAN.md task 5.7: SHAP bars in plain language, per-input provenance, confidence. */}
+      <ExplainabilityPanel />
+
+      {/* BUILD_PLAN.md task 5.6: false-alarm-cost slider, DDMA-console-shaped panel (task 3.7's
+          real console doesn't exist yet). */}
+      <FalseAlarmSlider />
     </aside>
   )
 }

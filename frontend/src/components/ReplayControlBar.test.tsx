@@ -85,4 +85,14 @@ describe('ReplayControlBar', () => {
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()
   })
+
+  it('"Scorecard" opens the counterfactual scorecard (BUILD_PLAN.md task 4.10)', () => {
+    useTickStore.setState({
+      modeState: { mode: 'replay', scenario_id: '_smoke', scenario_time: null, speed_factor: 1, paused: false },
+      scorecardOpen: false,
+    })
+    render(<ReplayControlBar />)
+    screen.getByText('Scorecard').click()
+    expect(useTickStore.getState().scorecardOpen).toBe(true)
+  })
 })
