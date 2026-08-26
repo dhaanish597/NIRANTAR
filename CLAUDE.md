@@ -246,81 +246,170 @@ make freeze                 # tag a known-good demo build
 
 > **Update this section every session. Keep it short and true.**
 
-- **Phase:** 1 — in progress. Tasks 1.1, 1.2, 1.3, 1.5, 1.6, and 1.11 done and verified against
-  real output (not just "ran without error"). Task 1.4 deliberately deferred to run last in
-  Phase 1 (see BUILD_PLAN.md) — it blocks nothing until task 1.15. Phase 0 is complete (all 16
-  tasks done and verified).
-- **Working end-to-end?** Yes, with entirely fabricated numbers, per Phase 0's DoD. Verified live
-  in a real browser (not just tests): click **Run Case Study** → pick `_smoke` → mode banner
-  flips to REPLAY, the 3×3 cell block escalates Green→Yellow→Orange→Red on the MapLibre map, the
-  priority list moves P3→P1, an action card ("Evacuate Now" / RED) appears with shelter + roads
-  to avoid, one `AI_FLAGGED` audit event is written per tick.
-- **Backend:** scaffolded and real for Phase 0's scope — `core/{clock,mode,bus}.py`,
-  `schemas/` (all Appendix A models), `ingest/{base,factory}.py` + `live/stub_source.py` +
-  `replay/scenario_source.py`, `pipeline.py` + stub `risk/impact/decision/dissemination`,
-  `audit/` (real in-memory hash chain), `api/` (`AppState`, REST routes), `ws/hub.py`, `main.py`.
-  `ingest/live/imerg.py` (task 1.6, real but not yet wired into `factory.py` — see below).
-  202 backend tests passing (`backend/tests/`).
-- **Frontend:** scaffolded and real for Phase 0's scope — Vite + React 19 + TS + Tailwind v4 +
-  MapLibre GL v6 + Zustand. `ModeBanner`, `MapView` (self-contained style, no external tile
-  requests — see note below), `RightRail`, `ScenarioPickerModal`. 11 frontend tests passing
-  (`frontend/src/**/*.test.ts(x)`).
-- **Risk model:** not trained — Phase 0's `risk/stub.py` is still what the live pipeline uses.
-  `risk/thresholds.py` (the real I-D/E-D threshold engine, task 1.11) exists and is tested but is
-  **not wired into the pipeline yet** — that's task 1.17/1.19, once `risk/model.py` also exists,
-  so both halves of the fusion rule are available at once.
-- **Static data:** `data/static/aizawl/dem.tif` (real Copernicus DEM GLO-30),
-  `data/static/aizawl/cells.gpkg` (2,912-cell 500m grid: elevation, slope, aspect, relief, TWI,
-  distance-to-road, land-cover; 212 of 2,912 cells legitimately null on terrain stats — edge
-  cells with no valid DEM pixel, inherited from task 1.2, not a new bug), and
-  `data/static/aizawl/exposure.gpkg` (task 1.3: 11 villages, 7 shelters, 19 hospitals, 0 bridges
-  — `man_made=bridge` is a rare OSM tag, documented, not a bug) all exist, all real, all
-  sanity-checked against actual values (not just "no exception raised") — see session log.
-  `cells.gpkg` has four intentionally-null columns (see task 1.2's note in BUILD_PLAN.md):
-  `plan_curvature`, `profile_curvature`, `dist_to_fault_km`, `lithology_class`. Villages carry
-  `population_worldpop_est`, a WorldPop-density-based estimate, not a Census figure — named
-  distinctly so it's never mistaken for ground truth.
-- **Database:** Docker Desktop is now running (was blocked, now fixed — see Required_by_me.md).
-  `docker-compose`'s `postgis` container is up and healthy. `scripts/load_db.py` (task 1.5) has
-  loaded Aizawl's cells + all four exposure layers into it for real — verified via direct `psql`
-  queries (row counts, `ST_SRID`), and confirmed idempotent by re-running the script and checking
-  counts didn't double. PostGIS only this pass — no SQLite/SpatiaLite fallback yet, a documented
-  scope cut (Docker being fixed removes the urgency).
-- **NASA COOLR:** `data/static/COOLR_Reports_Points.csv` obtained (14,963 rows, global scope, not
-  yet filtered to India/NER — that filtering is task 1.12's job, not done yet). Gitignored for
-  now pending a decision on committing a filtered subset (see Required_by_me.md).
-- **Scenarios ready:** `_smoke` only (fabricated, 10 frames, `data/scenarios/_smoke.json`). No
-  real-event scenarios yet — those are Phase 4.
+- **Phase:** 1 done for its P0 critical path (only 1.4 lithology deliberately deferred, 1.9 InSAR
+  cut-first, real IMD/SMAP live-download verification blocked on external auth). Phase 2 (impact
+  layer) done. Phase 3 (decision/dissemination) done except 3.9 (TTS, not attempted) and 3.11 (P2
+  crowdsourced photo, cut-first). Phase 4 (replay engine) done for Aizawl/Wayanad/Tupul; 4.6
+  (Sikkim GLOF) explicitly not attempted per its own "only if Phases 0-4 are green" instruction.
+  Phase 5 in progress (5.1 PWA done; 5.2/5.3/5.5/5.8 dispatched, not yet verified in this file —
+  check BUILD_PLAN.md's own checkboxes for the authoritative state; 5.4 aeroplane-mode rehearsal
+  and 5.9 visual design pass are still open and need a human/dedicated pass respectively). Phase 6
+  untouched — it's explicitly the user's (rehearsal, freeze, submission).
+- **Working end-to-end, for real now, not fabricated numbers:** click **Run Case Study** → pick
+  `aizawl-2024` (or `_smoke`) → mode banner flips to REPLAY → real villages (Durtlang, Reiek,
+  Tuirini, etc. — genuinely named places in `exposure.gpkg`) escalate Green→Yellow→Orange→Red
+  driven by the REAL trained XGBoost model + the real NE-Himalaya I-D/E-D threshold engine
+  (whichever is more concerned wins, task 1.19's fusion rule) → real road segments get `p_blocked`
+  from real runout-envelope geometry → real RII isolation + real EPS priority ranking → real
+  per-village escalation state machine → real routed `EvacuationRoute` to a real nearest shelter →
+  a real `ActionCard` fires → a real, hash-chained `AI_FLAGGED`/`ESCALATED` audit trail is written.
+  DDMA Console, Audit Trail view, and Village View (tasks 3.7/3.8/3.10) are real, not stubs —
+  Approve/Modify/Reject and "I have evacuated" write real audit events over real new endpoints.
+  Dissemination (CAP 1.2 + the 4 simulated channels) is built and tested but deliberately NOT
+  auto-fired from the pipeline — human-in-the-loop, see below.
+- **The central architectural invariant still holds**: nothing below `risk/`/`impact/`/
+  `decision/`/`dissemination/` branches on LIVE vs REPLAY. `pipeline.py` (see next bullet) takes a
+  timestamp and a set of observations and does not know or care where they came from.
+- **`pipeline.py` is wired to every real module** (this was the single biggest outstanding gap —
+  it was 100% Phase-0 stubs through Sessions 1-3 despite the real modules existing). Real risk
+  (ML + threshold fallback for any cell_id with no terrain match — see the module's own docstring,
+  rulings 1-2), real impact chain, real per-village escalation → routing → action cards. Caught
+  and fixed a real, 100%-reproducible (not a race) audit-hash-chain ordering bug in the process:
+  `AI_FLAGGED` must be appended before any same-tick `ESCALATED` event or its own `prev_hash`
+  silently chains from the wrong event — moved earlier in `process()`.
+- **The cell-id mismatch is mostly closed, not just documented.** LIVE mode's stub source and
+  every scenario file used to share one fake `aizawl_{row}{col}` 3×3 convention with no
+  relationship to `cells.gpkg`'s real grid — meaning real villages could never actually escalate
+  from a replay. `_smoke.json` and `aizawl-2024.json` (which share the same 9-cell layout) are now
+  remapped onto 9 real cells.gpkg cells, each a real named village's genuine nearest analysis
+  cell — `frontend/src/lib/grid.ts`'s `REMAPPED_REAL_CELL_POSITIONS` keeps the map rendering them.
+  `_smoke.json`'s rainfall values were also redesigned (a synthetic fixture, free to) — the
+  original ramp saturated the real multi-window threshold engine from frame 0. `wayanad-2024.json`
+  and `tupul-2022.json` are ALSO now remapped the same way, onto real Wayanad/Tupul cells (see
+  next bullet) — so all four scenarios should now produce real village-level escalation, not just
+  `_smoke`/Aizawl. LIVE mode's `ingest/live/stub_source.py` itself still emits the old fake
+  convention — nobody has migrated that yet; not urgent since LIVE mode isn't the demo's focus.
+- **Wayanad and Tupul are now real AOIs**, not just scenario files with nowhere to run. Both
+  registered in `config.AOIS` (town-center coordinates, `TODO(verify)`-flagged per this project's
+  own honesty convention — see the config comments). Real static data built for both: DEM, 500m
+  grid, exposure (villages/shelters/hospitals — Wayanad's genuinely includes Chooralmala,
+  Mundakkai, Puthumala, Meppadi, Vythiri; Tupul's genuinely includes a village literally named
+  "Tupul"), and a real OSM road graph. **No ML model was trained for either** — Wayanad
+  deliberately (CLAUDE.md rule 9, NER-first — it's the hook only), Tupul because its NER-inventory
+  coverage is too sparse (3-4 trusted points) to be defensible; both rely on the real
+  threshold-engine fallback, which is the documented credible-primary signal anyway.
+- **Risk model: trained, real, honestly modest.** `data/models/xgb_terrain_v1.json` +
+  `eval_report.md`: **AUC-ROC 0.696, PR-AUC 0.500, n=56** (14 positive / 42 negative, Aizawl-only,
+  leave-one-quadrant-out spatial CV — NOT "by district," there's only one district's worth of
+  terrain grid built). Explicitly not a headline number — the report says so, and the threshold
+  engine remains the credible primary per the risk register's own anticipation. Terrain-only (no
+  rainfall features — IMERG/SMAP real-download verification is still blocked on external auth, see
+  below), so `lithology_class`/`plan_curvature`/`profile_curvature`/`dist_to_fault_km` are 100%
+  missing features on purpose, ready for task 1.4/1.2's real values the moment they land with no
+  retrain-time schema change needed.
+- **Static data (Aizawl):** `dem.tif`, `cells.gpkg` (2,912 cells), `exposure.gpkg` (11 villages, 7
+  shelters, 19 hospitals, 0 bridges) — unchanged since Session 2, still real, still sanity-checked.
+  `data/osm/aizawl_graph.pkl` (3,622 nodes, 8,808 edges, real OSM Overpass pull) is new this
+  session. All of these are gitignored (rule 15) and were NOT present in `main`'s own working
+  directory at the start of this session (only in individual agents' now-deleted worktrees) — they
+  were regenerated directly in `main` specifically so the pipeline-integration work could be
+  tested against real data. If you're starting a fresh checkout, you need to regenerate them
+  (`scripts/fetch_dem.py`, `build_grid.py`, `fetch_exposure.py`, `build_road_graph.py`,
+  `python -m ml.train --aoi aizawl`) before real-data-dependent tests will run instead of skip.
+- **NASA COOLR:** `data/static/ner_inventory.csv` (committed, small, task 1.12 done) — 14,753
+  global rows filtered to 504 NER rows across all 8 states.
+- **Scenarios ready:** all 4 — `_smoke`, `aizawl-2024`, `wayanad-2024`, `tupul-2022` — validate and
+  dry-run through the real pipeline. `sikkim-glof-2023` not attempted (task 4.6, stretch-only).
 - **Known gaps / deliberate deferrals (not blockers, but worth knowing about):**
-  - `RunoutEnvelope` is computed by `impact/stub.py` but has no field on `TickResult`
-    (Appendix A) — not broadcast to the frontend yet. Phase 2 needs to decide how runout geometry
-    reaches the UI (a schema addition vs. a separate endpoint).
-  - `MapView` renders a **self-contained MapLibre style with no basemap imagery** — a solid
-    background plus our own risk-cell layer, no external tile requests at all. This was a
-    deliberate choice so CLAUDE.md rule 10 ("demo runs with the network cable unplugged") holds
-    from Phase 0 on rather than being deferred to Phase 5's PMTiles work (task 5.2). Phase 5 adds
-    a real offline basemap *underneath* the existing layer, it doesn't replace this setup.
-  - Cell geometry in the **live pipeline is still synthetic** (`frontend/src/lib/grid.ts`'s 3×3
-    square layout) even though real cell geometry now exists in `data/static/aizawl/cells.gpkg`.
-    Nothing has wired the real grid into `ingest`/`risk`/the API yet — that's a Phase 1C/2 task
-    (real cell_ids need to replace the `aizawl_{row}{col}` stub convention everywhere: stub_source,
-    _smoke.json, grid.ts). Don't assume this is done just because the grid file exists.
-  - `ingest/factory.py` (new, not in the original file list) is the one place outside `core/`
-    that branches on mode — consistent with CLAUDE.md §2 naming `ingest/` as an allowed
-    mode-aware location, but flagging the addition since it wasn't literally named before.
-  - `backend/app/config.py` now exists (Phase 1 needed it for AOI bounding boxes — see session
-    log). `api/routes.py`'s `/api/aoi/{id}` now reads from it instead of its own duplicate dict.
-- **External access still needed** (see `Required_by_me.md`): NASA Earthdata account + GES DISC
-  authorization are now COMPLETE and verified against real live downloads. IMD API access not yet requested
-  (blocks 1.8, P1, circuit-broken so not critical path). GSI Bhukosh (task 1.4) deliberately deprioritized.
-- **Known blockers:** None for Phase 1's P0 critical path.
-- **Next action:** task 1.7 (`ingest/live/smap.py`) or task 1.12 (`ml/build_inventory.py`, COOLR CSV already exists).
+  - Dissemination (CAP 1.2, the 4 simulated channels, `record_dissemination`) is real and tested
+    but **not auto-fired from `pipeline.py`** — CLAUDE.md rule 9's human-in-the-loop principle
+    means only a DDMA-approval action should trigger it. `POST /api/ddma/decide` exists and calls
+    `record_ddma_decision`; nothing yet chains an approval to an actual channel send. That's the
+    next real integration gap in the decision/dissemination stack, not this session's pipeline
+    wiring (which deliberately stopped at generating the recommendation).
+  - `AI_FLAGGED`'s `alert_id` is tick-scoped (`tick-{aoi}-{t}`) while `ActionCard`/`DDMA_APPROVED`/
+    `DISSEMINATED` events are village-scoped (`card-{village_id}-{t}`) — the two audit chains
+    don't merge under one alert_id yet. The Audit Trail view surfaces this honestly (a "not yet
+    reached" row) rather than hiding it. Unifying alert_id schemes is a real follow-up, not
+    attempted this session.
+  - LIVE mode (`ingest/live/stub_source.py`) still emits the Phase-0 fake `aizawl_401`-style cell
+    convention — the cell-id migration only touched the 4 committed scenario files, not the LIVE
+    path. LIVE mode isn't the demo's focus (REPLAY is), so this is low-priority but real.
+  - `impact/priority.py`'s `resolve_priority_inputs()` re-reads `cells.gpkg`/`exposure.gpkg` from
+    disk every tick (it takes the tick's dynamic p_fail dict as an argument, so it can't share the
+    same process-wide cache the other static loaders in `pipeline.py` use). Fine for a demo's tick
+    cadence, a real perf pass would split it into a cached-static + cheap-dynamic half.
+  - `MapView` still renders a **self-contained MapLibre style with no basemap imagery** (Phase 0's
+    choice, rule 10). Task 5.2 (PMTiles) adds a real offline basemap *underneath* it — check
+    BUILD_PLAN.md's own checkbox for whether that's landed since this was last updated.
+  - `ingest/factory.py` is the one place outside `core/` that branches on mode (consistent with
+    CLAUDE.md §2's allowance for `ingest/`).
+- **External access still needed** (see `Required_by_me.md`, kept current): IMD API key (task
+  1.8's real verification; the adapter code itself is written/tested). GSI Bhukosh (task 1.4,
+  still deliberately deferred, has a documented fallback). SMAP (task 1.7) may need its OWN
+  separate NSIDC Earthdata authorization, not automatically covered by GES DISC's — genuinely
+  unconfirmed, flagged for the user to check.
+- **Known blockers:** None for Phase 1-5's P0 critical path. Phase 6 is entirely the user's.
+- **Next action:** verify Phase 5's dispatched-but-not-yet-confirmed tasks (5.2/5.3/5.5/5.8) landed
+  cleanly, then 5.9 (visual design pass) and 5.11 (`make demo-check`) are the natural remaining
+  P0/P1 work before Phase 6 (rehearsal/freeze/submit) can start for real.
 
 ---
 
 ## 12. Session Log
 
 > Newest entry at the top. One entry per session. Keep each to ~5 lines.
+
+### 2026-08-26 — Session 4 (autonomous multi-wave, controller + parallel worktree-isolated agents)
+
+- **Did:** A long autonomous session, dispatched across several waves of parallel worktree-isolated
+  subagents (each reviewed, independently re-verified — not just trusted — before merging). Wave 1:
+  ML pipeline (tasks 1.12-1.19, real trained model + eval report), impact layer (2.1-2.5, real road
+  graph + runout + RII + EPS, `RunoutEnvelope` schema gap closed), decision/dissemination
+  groundwork (3.2/3.4/3.5), scenario engine (4.1-4.5/4.7, 3 real case-study scenarios), frontend
+  Phase-2/4 UI. Wave 2: SMAP/IMD adapters (1.7/1.8), decision layer completion (2.6/3.1/3.3/3.6 +
+  replay pause/resume/speed routes), frontend Phase-5 polish + counterfactual scorecard. Then the
+  controller directly wired `pipeline.py` to every real module (it had stayed 100% Phase-0 stubs
+  through Sessions 1-3 despite the modules existing) — regenerated Aizawl's road graph + trained
+  model directly in `main` to have real data to test against, fixed a real deterministic
+  audit-hash-chain ordering bug this exposed, and did the cell-id migration for `_smoke`/
+  `aizawl-2024` (redesigned `_smoke.json`'s rainfall values too, computed against the real
+  threshold engine, not hand-guessed). Wave 3: DDMA Console/Audit Trail/Village View
+  (3.7/3.8/3.10, with real new backend routes), Wayanad+Tupul AOI static-data build + their own
+  cell-id migration (closing the AOI-config gap those scenarios' own commits had flagged). Wave 4
+  (Phase 5 offline/polish) dispatched, not yet verified as of this entry — check BUILD_PLAN.md.
+  ~975 backend + ~200 frontend tests passing by the end of this entry's writing.
+- **Broke / discovered:**
+  1. A previous session's Session-3 work (GES DISC authorization completed, real IMERG download
+     verified) was sitting uncommitted in `main`'s working tree the entire time — found via `git
+     status`, committed as-is, credited to when it was actually done, not silently absorbed.
+  2. The impact-layer wave-1 agent's session transcript was lost before it could report back
+     (harness-side, not the agent's fault) — its real, working, tested code (278 passing tests) was
+     still sitting uncommitted in its worktree. Reviewed directly (citations, honesty-rule
+     compliance, a real independent test run) and committed by the controller instead of a
+     self-report, rather than re-dispatching and losing real completed work.
+  3. Wiring the real risk/impact/decision modules into `pipeline.py` surfaced that EVERY cell_id
+     in LIVE mode and every scenario file used the Phase-0 stub `aizawl_{row}{col}` convention,
+     which structurally never matches `cells.gpkg`'s real grid — meaning real villages could never
+     actually escalate from a replay despite all the real modules existing and being individually
+     correct. This was the session's most consequential finding; fixed for `_smoke`/`aizawl-2024`/
+     `wayanad-2024`/`tupul-2022` (9 real cells each, real nearest-village resolution), not fixed
+     for LIVE mode's stub source (lower priority, not the demo's focus).
+  4. The audit-hash-chain ordering bug (#1 above) was caught by a 100%-reproducible test failure —
+     confirmed deterministic (identical failing hash on 3 repeat runs) before spending time on an
+     asyncio-race theory that turned out to be a red herring.
+  5. Multiple frontend agents independently built a `REMAPPED_REAL_CELL_POSITIONS` table in
+     `grid.ts` for their own AOI's cells (Aizawl vs. Wayanad+Tupul) — same name, different value
+     shape — a real, expected merge conflict from genuinely parallel work, resolved by hand into
+     one combined table.
+  6. `test_smoke_scenario.py`'s own rewritten escalation-arc assertion initially failed because
+     `EscalationStateMachine.current_stage()` returns LIVE state — reading it in a loop AFTER all
+     ticks had already run (rather than inside the tick-processing loop) silently returned the same
+     final stage 10 times over, not a real per-tick history. A real test bug, not a pipeline bug.
+- **Next:** confirm wave 4 (5.2/5.3/5.5/5.8) landed cleanly, then 5.9 (visual design pass, read the
+  frontend-design skill first) and 5.11 (`make demo-check`, wire the false-alarm slider's real
+  numbers in if not already) are the natural remaining work before Phase 6 (entirely the user's —
+  rehearsal, freeze, submission) can start for real.
 
 ### 2026-08-25 — Session 3
 
