@@ -1,0 +1,44 @@
+{
+  "_fixture_note": "Synthetic-but-realistic districtnowcast response (task 1.10), shaped to the field list documented at https://api.imd.gov.in/public/api_reference.html (fetched and read this session) and the {status, message, totalCount, data:[...]} envelope confirmed for other endpoints on the same API surface (cyclone_track/cyclone_wind/sunmoon) - see imd.py's module docstring for the full citation and the honest TODO(verify) on whether districtnowcast/districtwarning specifically use this exact envelope. Not copied from a real response (real network access to api.imd.gov.in was blocked in this environment, and IMD API access itself has not yet been granted for this project - see Required_by_me.md).",
+  "status": "Success",
+  "message": "District wise nowcast",
+  "totalCount": 3,
+  "data": [
+    {
+      "Station": "Aizawl",
+      "Date": "2026-08-26",
+      "Cat1": "0",
+      "Cat2": "0",
+      "Cat3": "1",
+      "Cat19": "0",
+      "message": "Thunderstorm with heavy rain likely over Aizawl district during next 3 hours.",
+      "toi": "1015",
+      "Vupto": "1315",
+      "color": "3"
+    },
+    {
+      "Station": "Lunglei",
+      "Date": "2026-08-26",
+      "Cat1": "0",
+      "Cat2": "0",
+      "Cat3": "0",
+      "Cat19": "0",
+      "message": "No significant weather.",
+      "toi": "1015",
+      "Vupto": "1315",
+      "color": "1"
+    },
+    {
+      "Station": "Champhai",
+      "Date": "2026-08-26",
+      "Cat1": "0",
+      "Cat2": "1",
+      "Cat3": "0",
+      "Cat19": "0",
+      "message": "Isolated moderate rain likely.",
+      "toi": "1015",
+      "Vupto": "1315",
+      "color": "2"
+    }
+  ]
+}

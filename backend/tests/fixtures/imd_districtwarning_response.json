@@ -1,0 +1,40 @@
+{
+  "_fixture_note": "Synthetic-but-realistic districtwarning response (task 1.10) - see imd_districtnowcast_response.json's own note for the same caveats (shaped to real documented field names, envelope not independently confirmed for this specific endpoint, not sampled from a real response).",
+  "status": "Success",
+  "message": "District wise warning",
+  "totalCount": 2,
+  "data": [
+    {
+      "Obj_id": "573",
+      "Date": "2026-08-26",
+      "UTC": "0300",
+      "District": "Aizawl",
+      "Day_1": "3",
+      "Day_2": "2",
+      "Day_3": "1",
+      "Day_4": "1",
+      "Day_5": "1",
+      "Day1_Color": "3",
+      "Day2_Color": "2",
+      "Day3_Color": "1",
+      "Day4_Color": "1",
+      "Day5_Color": "1"
+    },
+    {
+      "Obj_id": "574",
+      "Date": "2026-08-26",
+      "UTC": "0300",
+      "District": "Lunglei",
+      "Day_1": "1",
+      "Day_2": "1",
+      "Day_3": "1",
+      "Day_4": "1",
+      "Day_5": "1",
+      "Day1_Color": "1",
+      "Day2_Color": "1",
+      "Day3_Color": "1",
+      "Day4_Color": "1",
+      "Day5_Color": "1"
+    }
+  ]
+}

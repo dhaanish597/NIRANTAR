@@ -24,6 +24,14 @@ class AoiConfig(BaseModel):
     # distance. Used by scripts/build_grid.py (task 1.2) and will be reused by
     # scripts/build_road_graph.py (task 2.1).
     utm_epsg: int
+    # District name string as IMD's public API is expected to spell it (`District`/`Station`
+    # fields of the districtnowcast/districtwarning endpoints — ingest/live/imd.py, task 1.8).
+    # Optional (defaults to None, existing AOI configs/tests that predate task 1.8 stay valid
+    # unchanged) — imd.py falls back to deriving a guess from `name` when unset. NOT verified
+    # against a real IMD response (network access to api.imd.gov.in was blocked this session, and
+    # IMD API access itself hasn't been requested yet per Required_by_me.md) — TODO(verify) the
+    # exact casing/spelling IMD actually uses once a real response can be inspected.
+    imd_district_name: str | None = None
 
 
 # Aizawl's bbox is a Phase 1 engineering choice, not a cited research figure: centered on the
@@ -41,6 +49,7 @@ AOIS: dict[str, AoiConfig] = {
         center_lon=92.7173,
         bbox=(92.60, 23.60, 92.85, 23.85),
         utm_epsg=32646,  # WGS 84 / UTM zone 46N — covers 90-96E, Aizawl (92.7E) is well inside
+        imd_district_name="Aizawl",  # TODO(verify) — see AoiConfig.imd_district_name's comment
     ),
 }
 
