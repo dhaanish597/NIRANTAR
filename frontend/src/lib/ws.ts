@@ -1,4 +1,4 @@
-import type { TickResult } from '../types/schemas'
+import type { Announcement, TickResult } from '../types/schemas'
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000/ws/ticks'
 
@@ -6,15 +6,20 @@ export type WsStatus = 'connecting' | 'open' | 'closed'
 
 export interface TickSocketHandlers {
   onTick: (tick: TickResult) => void
+  onAnnouncement?: (announcement: Announcement) => void
   onStatusChange?: (status: WsStatus) => void
 }
 
 const RECONNECT_DELAYS_MS = [500, 1000, 2000, 5000] // capped backoff; demo shouldn't die on a blip
 
-/** Connects to /ws/ticks and auto-reconnects on close (a judge's demo dropping one frame of
- * WebSocket should not end the demo). Returns a cleanup function that stops reconnecting and
- * closes the socket. */
-export function connectTickSocket({ onTick, onStatusChange }: TickSocketHandlers): () => void {
+/** Connects to /ws/ticks and auto-reconnects on close. Multiplexes two message shapes off the
+ * same connection: a bare TickResult (no `type` field), or `{type: "announcement", data:
+ * Announcement}` — see backend/app/ws/hub.py's matching wrapper. */
+export function connectTickSocket({
+  onTick,
+  onAnnouncement,
+  onStatusChange,
+}: TickSocketHandlers): () => void {
   let socket: WebSocket | null = null
   let attempt = 0
   let stopped = false
@@ -31,8 +36,12 @@ export function connectTickSocket({ onTick, onStatusChange }: TickSocketHandlers
     }
 
     socket.onmessage = (event: MessageEvent<string>) => {
-      const tick = JSON.parse(event.data) as TickResult
-      onTick(tick)
+      const parsed = JSON.parse(event.data) as TickResult | { type: 'announcement'; data: Announcement }
+      if ('type' in parsed && parsed.type === 'announcement') {
+        onAnnouncement?.(parsed.data)
+      } else {
+        onTick(parsed as TickResult)
+      }
     }
 
     socket.onclose = () => {

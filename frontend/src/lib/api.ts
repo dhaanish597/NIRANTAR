@@ -1,5 +1,6 @@
 import type {
   ActionCard,
+  Announcement,
   AoiInfo,
   AuditEvent,
   ModeState,
@@ -62,4 +63,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  // Sub-project 1 (Foundation): the real dissemination trigger — approves (if not already),
+  // sends through every real simulated channel, records a real DISSEMINATED audit event.
+  sendAnnouncement: (payload: {
+    action_card: ActionCard
+    officer_id: string
+    recipient_count: number
+    message?: string
+    language?: string
+  }) =>
+    request<Announcement>('/api/announcements', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listAnnouncements: () => request<Announcement[]>('/api/announcements'),
 }
