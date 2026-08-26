@@ -61,7 +61,6 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import AsyncIterator
-from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO_ROOT / "backend"))
@@ -72,6 +71,8 @@ import requests  # noqa: E402
 
 from app.config import AoiConfig, get_aoi  # noqa: E402
 from app.core.clock import Clock, LiveClock  # noqa: E402
+from app.ingest.live.earthdata_common import EarthdataSession as _EarthdataSession  # noqa: E402
+from app.ingest.live.earthdata_common import HDF5_MAGIC  # noqa: E402
 from app.schemas.ingest import CellObservation, ObservationFrame  # noqa: E402
 
 IMERG_BASE_URL = "https://gpm1.gesdisc.eosdis.nasa.gov/data/GPM_L3/GPM_3IMERGHHE.07"
@@ -81,12 +82,12 @@ IMERG_GRID_DEG = 0.1  # native IMERG pixel size
 IMERG_HDF5_GROUP = "Grid"
 IMERG_PRECIP_VAR = "precipitation"  # V07 name; V06 tools call this "precipitationCal" instead
 IMERG_FILL_VALUE = -9999.9
-HDF5_MAGIC = b"\x89HDF\r\n\x1a\n"
 
 GRANULE_CACHE_DIR = REPO_ROOT / "data" / "static" / "_imerg_granules"
-# Widen the trusted-host check beyond just gesdisc.eosdis.nasa.gov: urs.earthdata.nasa.gov is the
-# login host itself and every request round-trips through it.
-_EARTHDATA_HOST_SUFFIXES = ("earthdata.nasa.gov", "eosdis.nasa.gov")
+# `_EarthdataSession`/`HDF5_MAGIC` moved to earthdata_common.py (task 1.7, shared with smap.py)
+# and re-imported above under their original names — this module's own tests reference both names
+# directly on `imerg` and were re-run unchanged after the extraction (see earthdata_common.py's
+# module docstring).
 
 FEATURE_WINDOWS_HOURS = {
     "rain_1h": 1,
@@ -127,31 +128,8 @@ def granule_cache_path(half_hour_start: datetime, cache_dir: Path = GRANULE_CACH
 
 
 # =============================================================================================
-# Download (real cross-host-redirect Basic Auth fix — see module docstring)
+# Download (real cross-host-redirect Basic Auth fix — see earthdata_common.py / module docstring)
 # =============================================================================================
-class _EarthdataSession(requests.Session):
-    """Re-attaches Basic Auth across redirects within the Earthdata/EOSDIS host family.
-
-    `requests` strips the Authorization header on any cross-host redirect by default (a
-    deliberate security default, same one `curl` needs `--location-trusted` to override) — GES
-    DISC downloads redirect through urs.earthdata.nasa.gov and back, so without this override
-    every download attempt gets a silent 401. Confirmed necessary against a real request, not
-    assumed (see module docstring)."""
-
-    def __init__(self, username: str, password: str):
-        super().__init__()
-        self.auth = (username, password)
-
-    def rebuild_auth(self, prepared_request, response) -> None:
-        headers = prepared_request.headers
-        if "Authorization" not in headers:
-            return
-        redirect_host = urlparse(prepared_request.url).hostname or ""
-        if any(redirect_host.endswith(suffix) for suffix in _EARTHDATA_HOST_SUFFIXES):
-            return  # still within the trusted family — keep the header
-        del headers["Authorization"]
-
-
 def download_granule(
     half_hour_start: datetime,
     username: str,
