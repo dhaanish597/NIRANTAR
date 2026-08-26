@@ -42,10 +42,19 @@ export interface RoadSegmentRisk {
   contributing_cells: string[]
 }
 
+export interface Demographics {
+  children: number
+  seniors: number
+  adults: number
+  high_risk_households: number
+  source: 'simulated'
+}
+
 export interface VillageIsolation {
   village_id: string
   name: string
   population: number
+  demographics?: Demographics
   p_isolated: number
   isolated_now: boolean
   alternate_route_exists: boolean
@@ -157,4 +166,36 @@ export interface WhatIfResult {
   assumptions: string[]
   cell_count: number
   tick: TickResult
+}
+
+export interface ChannelResultSummary {
+  channel: string
+  recipient_count: number
+  delivered_count: number
+  acknowledged_count: number
+}
+
+/** POST/GET /api/announcements' wire shape (backend/app/schemas/announcement.py::Announcement).
+ * The real dissemination trigger: this is what a DDMA officer's Approve/Modify action in the
+ * Announce workspace actually produces, and what the Citizen Announcement tab reads. */
+export interface Announcement {
+  id: string
+  alert_id: string
+  village_id: string
+  stage: EscalationStage
+  message: string
+  language: string
+  issued_by: string
+  issued_at: string // ISO 8601
+  channel_results: ChannelResultSummary[]
+  cap_xml: string
+}
+
+/** Frontend-only for now (no backend schema until sub-project 3's verification workflow) — the
+ * shape Dashboard (sub-project 2) needs to exist so it can badge a route "Verified Safe" without
+ * a later schema change. */
+export interface VerificationRecord {
+  status: 'pending' | 'verified' | 'rejected'
+  verifiedBy?: string
+  verifiedAt?: string // ISO 8601
 }
