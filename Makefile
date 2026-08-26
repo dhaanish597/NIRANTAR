@@ -1,4 +1,4 @@
-.PHONY: up down dev dev-backend dev-frontend data graph train scenario test demo-check freeze
+.PHONY: up down dev dev-backend dev-frontend data graph tiles train scenario test demo-check freeze
 
 # backend/.venv layout differs Windows vs. POSIX — resolve once here so every target that needs
 # the venv's python (not whatever `python` happens to be first on PATH) uses the right one.
@@ -35,6 +35,13 @@ data:
 
 graph:
 	@echo "TODO(Phase 2): scripts/build_road_graph.py for AOI=$(AOI)"
+
+# BUILD_PLAN.md task 5.2: real, not a stub — builds data/tiles/<AOI>.pmtiles from the AOI's
+# already-built cells.gpkg (task 1.2) + road graph GeoJSON (task 2.1). Requires both to exist
+# first (make data / make graph, or the real scripts directly — see task 1.2/2.1 for why those
+# two Phase-1/2 targets above are still TODO stubs, unrelated to this one).
+tiles:
+	backend/$(VENV_PY) scripts/build_tiles.py --aoi $(if $(AOI),$(AOI),aizawl)
 
 train:
 	@echo "TODO(Phase 1): ml/train.py"

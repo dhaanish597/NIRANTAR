@@ -1,8 +1,10 @@
 import type { Geometry } from 'geojson'
-import { type GeoJSONSource, MapLibreMap } from 'maplibre-gl'
+import { addProtocol, type GeoJSONSource, MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { PMTiles, Protocol } from 'pmtiles'
 import { useEffect, useRef } from 'react'
 import { cellRisksToFeatureCollection } from '../lib/grid'
+import { loadOfflineTileSource } from '../lib/offlineTiles'
 import { roadRisksToFeatureCollection } from '../lib/roads'
 import { villagesToFeatureCollection } from '../lib/villages'
 import { useTickStore } from '../store/useTickStore'
@@ -28,6 +30,88 @@ const ROAD_LAYER_ID = 'road-risks-line'
 const VILLAGE_SOURCE_ID = 'villages'
 const VILLAGE_LAYER_ID = 'villages-circle'
 
+// BUILD_PLAN.md task 5.2: a real offline PMTiles reference layer (the AOI's terrain-grid
+// boundaries + real OSM road edges, scripts/build_tiles.py) rendered UNDERNEATH the live per-tick
+// GeoJSON layers above — geographic context that's present even before any tick has arrived, and
+// (once cached, frontend/src/lib/offlineTiles.ts) still there with the network disabled. This is
+// still zero external tile requests: the archive is fetched from THIS origin's own `/tiles/`
+// path (vite.config.ts's offlineTilesPlugin), never a remote tile host — MapView's Phase-0
+// no-basemap-imagery choice (CLAUDE.md rule 10) is unchanged, this is a vector reference layer,
+// not a photographic basemap.
+const OFFLINE_SOURCE_ID = 'offline-tiles'
+const OFFLINE_CELLS_LAYER_ID = 'offline-cells-outline'
+const OFFLINE_ROADS_LAYER_ID = 'offline-roads-line'
+
+// The PMTiles<->MapLibre protocol glue is process-global by design (maplibre-gl's `addProtocol`
+// is a module-level registration, not per-Map) — registered once here, shared by every <MapView>
+// instance (the Ops screen and Village View's route map both render one), rather than fighting
+// over a single global registration from inside the component effect.
+const offlinePmtilesProtocol = new Protocol()
+let offlinePmtilesProtocolRegistered = false
+
+function ensureOfflinePmtilesProtocolRegistered(): void {
+  if (offlinePmtilesProtocolRegistered) return
+  addProtocol('pmtiles', offlinePmtilesProtocol.tile)
+  offlinePmtilesProtocolRegistered = true
+}
+
+// Only Aizawl has a real built archive today (data/static/aizawl/*, data/osm/aizawl_graph.geojson
+// — the only AOI with Phase-1/2 static data at all, same scope every other AOI-specific frontend
+// piece in this codebase already documents, e.g. lib/priorityDetail.ts). Keyed off the loaded
+// AOI id below (falls back to this constant before the real AOI has loaded, matching
+// FALLBACK_CENTER's own pattern), not hardcoded blindly — an AOI with no archive simply fails the
+// fetch and the reference layer is skipped (see `addOfflineReferenceLayer`'s catch below), it
+// does not render another AOI's tiles under the wrong map.
+const DEFAULT_TILES_AOI_ID = 'aizawl'
+
+async function addOfflineReferenceLayer(
+  map: MapLibreMap,
+  aoiId: string,
+  isCancelled: () => boolean,
+): Promise<void> {
+  // Wrapped as one big try/catch, not several small ones: this whole function is a best-effort
+  // enhancement layered on top of the always-real live risk map (task 5.2's own scope — "no
+  // basemap") — any failure in it (a missing archive, a test/environment maplibre-gl mock
+  // lacking `addProtocol`, the map having been torn down mid-await, ...) must degrade to "no
+  // reference layer this session", never crash or surface an unhandled rejection.
+  try {
+    ensureOfflinePmtilesProtocolRegistered()
+    const source = await loadOfflineTileSource(aoiId)
+    if (isCancelled()) return
+
+    offlinePmtilesProtocol.add(new PMTiles(source))
+    const sourceUrl = `pmtiles://${source.getKey()}`
+
+    if (map.getSource(OFFLINE_SOURCE_ID)) return // already added (e.g. React StrictMode re-run)
+    map.addSource(OFFLINE_SOURCE_ID, { type: 'vector', url: sourceUrl })
+    map.addLayer(
+      {
+        id: OFFLINE_CELLS_LAYER_ID,
+        type: 'line',
+        source: OFFLINE_SOURCE_ID,
+        'source-layer': 'cells',
+        paint: { 'line-color': '#334155', 'line-width': 0.5, 'line-opacity': 0.6 },
+      },
+      FILL_LAYER_ID, // insert BELOW the live risk-cell fill layer, not on top of it
+    )
+    map.addLayer(
+      {
+        id: OFFLINE_ROADS_LAYER_ID,
+        type: 'line',
+        source: OFFLINE_SOURCE_ID,
+        'source-layer': 'roads',
+        paint: { 'line-color': '#475569', 'line-width': 1, 'line-opacity': 0.7 },
+      },
+      FILL_LAYER_ID,
+    )
+  } catch (err) {
+    // No archive built for this AOI yet, a fetch failure with nothing cached to fall back on, the
+    // map having been torn down mid-await, or (in tests) a maplibre-gl mock missing `addProtocol`
+    // — the map still renders correctly without this reference layer either way.
+    console.warn(`offline reference tile layer unavailable for AOI ${aoiId}`, err)
+  }
+}
+
 // Fallback center matches the "aizawl" AOI's real center (api/routes.py's _STUB_AOIS) exactly —
 // Phase 0 only ever runs one AOI, so this coincidence is intentional, not fragile. If AOI
 // selection becomes dynamic in a later phase, this component needs a proper "center on first
@@ -47,6 +131,7 @@ export function MapView({ routeGeometry = null }: { routeGeometry?: Geometry | n
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
+    let cancelled = false
 
     const map = new MapLibreMap({
       container: containerRef.current,
@@ -137,9 +222,12 @@ export function MapView({ routeGeometry = null }: { routeGeometry?: Geometry | n
       map.on('mouseleave', VILLAGE_LAYER_ID, () => {
         map.getCanvas().style.cursor = ''
       })
+
+      void addOfflineReferenceLayer(map, DEFAULT_TILES_AOI_ID, () => cancelled)
     })
 
     return () => {
+      cancelled = true
       map.remove()
       mapRef.current = null
     }
