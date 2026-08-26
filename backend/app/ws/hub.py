@@ -8,6 +8,7 @@ discriminator — see frontend/src/lib/ws.ts's matching parse.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 
@@ -34,19 +35,38 @@ async def ws_ticks(websocket: WebSocket) -> None:
                 asyncio.ensure_future(tick_queue.get()): tick_queue,
                 asyncio.ensure_future(announcement_queue.get()): announcement_queue,
             }
-            while True:
-                done, _ = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-                for task in done:
-                    queue = pending.pop(task)
-                    message = task.result()
-                    if isinstance(message, TickResult):
-                        await websocket.send_text(message.model_dump_json())
-                    else:
-                        await websocket.send_text(
-                            json.dumps(
-                                {"type": "announcement", "data": message.model_dump(mode="json")}
+            try:
+                while True:
+                    done, _ = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                    for task in done:
+                        queue = pending.pop(task)
+                        message = task.result()
+                        if isinstance(message, TickResult):
+                            await websocket.send_text(message.model_dump_json())
+                        else:
+                            await websocket.send_text(
+                                json.dumps(
+                                    {
+                                        "type": "announcement",
+                                        "data": message.model_dump(mode="json"),
+                                    }
+                                )
                             )
-                        )
-                    pending[asyncio.ensure_future(queue.get())] = queue
+                        pending[asyncio.ensure_future(queue.get())] = queue
+            finally:
+                # Whatever is still in `pending` on the way out (WebSocketDisconnect, any other
+                # exception, or the task being cancelled on server shutdown) is a scheduled
+                # `queue.get()` Task that will now never resolve — the `async with` above only
+                # unsubscribes the queue from the Bus, it does NOT cancel outstanding Tasks
+                # created via `asyncio.ensure_future`. Left uncancelled, each disconnect leaks up
+                # to 2 pending Tasks (visible as "Task was destroyed but it is pending!" on GC) —
+                # real, unbounded resource growth across reconnects in a long-running demo
+                # session. Cancel every remaining task and await it so it unwinds immediately
+                # rather than lingering for the garbage collector.
+                for task in pending:
+                    task.cancel()
+                for task in pending:
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await task
     except WebSocketDisconnect:
         logger.info("client disconnected from /ws/ticks")
