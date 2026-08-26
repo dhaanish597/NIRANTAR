@@ -51,6 +51,50 @@ AOIS: dict[str, AoiConfig] = {
         utm_epsg=32646,  # WGS 84 / UTM zone 46N — covers 90-96E, Aizawl (92.7E) is well inside
         imd_district_name="Aizawl",  # TODO(verify) — see AoiConfig.imd_district_name's comment
     ),
+    # Registered to close the exact gap BUILD_PLAN.md tasks 4.4/4.5 flagged in their own commit
+    # notes: "aoi_id: 'wayanad'/'tupul' is NOT registered in backend/app/config.py — no
+    # DEM/500m-grid/road-graph exists." Same honesty framing as the Aizawl bbox comment above,
+    # applied to two AOIs whose docs/reference/ writeup (see the NER landslide research doc's
+    # event table) gives no precise lat/lon for the actual failure sites (Mundakkai/Chooralmala/
+    # Puthumala; the Tupul railway camp) — only place names and district/state. Per CLAUDE.md's
+    # instruction for exactly this situation, each AOI below is centered on a real, public,
+    # unremarkable town-center coordinate near the cited event, NOT a claim about the precise
+    # failure point or the final analysis grid's boundary. TODO(verify): tighten toward the
+    # actual failure coordinates once a source for them exists in docs/reference/.
+    "wayanad": AoiConfig(
+        id="wayanad",
+        name="Wayanad (Meppadi), Kerala",
+        # Meppadi is the nearest significant town to the 30 Jul 2024 Mundakkai/Chooralmala/
+        # Punchirimattom failures and to the Puthumala rain gauge cited in docs/reference/ (all
+        # in Wayanad district's Vythiri taluk) — chosen over the district HQ (Kalpetta, ~15km
+        # further from the event) so the AOI is centered on the actually-relevant hilly terrain,
+        # same reasoning Aizawl's own comment gives for including the NH-6/Hunthar corridor.
+        # Coordinate is an approximate, defensible public town-center figure (TODO(verify) exact
+        # digits against a cited source) — not independently surveyed for this project.
+        center_lat=11.61,
+        center_lon=76.12,
+        # Wider margin (~0.15deg, ~16-17km) than Aizawl's 0.125deg: this AOI's center is a
+        # nearby town, not the failure site itself, so extra margin is needed to have any real
+        # chance of covering Mundakkai/Chooralmala/Puthumala inside the bbox. Still an engineering
+        # choice, not a cited boundary — same status as Aizawl's bbox comment.
+        bbox=(75.97, 11.46, 76.27, 11.76),
+        utm_epsg=32643,  # WGS 84 / UTM zone 43N — covers 72-78E, Wayanad (76.1E) is well inside
+        imd_district_name="Wayanad",  # TODO(verify) — see AoiConfig.imd_district_name's comment
+    ),
+    "tupul": AoiConfig(
+        id="tupul",
+        name="Noney (Tupul), Manipur",
+        # Noney is the district HQ / nearest named town to the Tupul railway construction site
+        # (Jiribam-Imphal line) where the 30 Jun 2022 two-phase failure occurred, per
+        # docs/reference/'s event table ("Tupul/Noney, Manipur"). Coordinate is an approximate,
+        # defensible public town-center figure (TODO(verify) exact digits against a cited
+        # source), same status as Wayanad's center above.
+        center_lat=24.7667,
+        center_lon=93.75,
+        bbox=(93.60, 24.6167, 93.90, 24.9167),  # ~0.15deg margin, same reasoning as Wayanad above
+        utm_epsg=32646,  # WGS 84 / UTM zone 46N — same zone as Aizawl, Noney (93.75E) fits inside
+        imd_district_name="Noney",  # TODO(verify) — see AoiConfig.imd_district_name's comment
+    ),
 }
 
 
