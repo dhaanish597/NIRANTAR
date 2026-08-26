@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
+from app.impact.demographics import simulate_demographics
 from app.schemas import (
     ActionCard,
     Attribution,
@@ -133,6 +134,7 @@ class TestImpact:
             village_id="v_hunthar",
             name="Hunthar",
             population=1200,
+            demographics=simulate_demographics(1200),
             p_isolated=0.55,
             isolated_now=False,
             alternate_route_exists=True,

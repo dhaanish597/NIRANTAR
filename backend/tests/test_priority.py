@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.config import EPS_P1_THRESHOLD, EPS_P2_THRESHOLD, EPS_WEIGHTS
+from app.impact.demographics import simulate_demographics
 from app.impact.priority import compute_settlement_priorities, compute_settlement_priority
 from app.schemas.impact import VillageIsolation
 
@@ -21,6 +22,7 @@ def make_village(
 ) -> VillageIsolation:
     return VillageIsolation(
         village_id=village_id, name="Test Village", population=population,
+        demographics=simulate_demographics(population),
         p_isolated=p_isolated, isolated_now=isolated_now, alternate_route_exists=not isolated_now,
         est_duration_hours=None, severed_links=[],
     )

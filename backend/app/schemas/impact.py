@@ -28,10 +28,23 @@ class RoadSegmentRisk(BaseModel):
     contributing_cells: list[str] = Field(default_factory=list)
 
 
+class Demographics(BaseModel):
+    """Simulated household/census-level breakdown — no such dataset exists for the NER pilot
+    AOIs. Derived deterministically from each village's real WorldPop-based `population` figure
+    (see impact/demographics.py). Never presented as Census/ground-truth data."""
+
+    children: int = Field(ge=0)
+    seniors: int = Field(ge=0)
+    adults: int = Field(ge=0)
+    high_risk_households: int = Field(ge=0)
+    source: Literal["simulated"] = "simulated"
+
+
 class VillageIsolation(BaseModel):
     village_id: str
     name: str
     population: int = Field(ge=0)
+    demographics: Demographics
     p_isolated: float = Field(ge=0.0, le=1.0)
     isolated_now: bool
     alternate_route_exists: bool

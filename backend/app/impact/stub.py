@@ -11,6 +11,7 @@ separate REST/tile layer).
 """
 from __future__ import annotations
 
+from app.impact.demographics import simulate_demographics
 from app.schemas.impact import (
     RoadSegmentRisk,
     RunoutEnvelope,
@@ -63,6 +64,7 @@ def compute_impact(
         village_id=STUB_VILLAGE_ID,
         name="Hunthar (stub)",
         population=1200,  # fabricated — Phase 1 exposure data (scripts/fetch_exposure.py) replaces this
+        demographics=simulate_demographics(1200),
         p_isolated=avg,
         isolated_now=road.severed,
         alternate_route_exists=not road.severed,

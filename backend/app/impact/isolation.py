@@ -61,6 +61,7 @@ from app.config import (
     ROAD_CLEARANCE_HOURS_BY_CLASS,
     ROAD_CLEARANCE_HOURS_DEFAULT,
 )
+from app.impact.demographics import simulate_demographics
 from app.schemas.impact import RoadSegmentRisk, VillageIsolation
 
 
@@ -245,6 +246,7 @@ def compute_village_isolation(
         village_id=village.village_id,
         name=village.name,
         population=village.population,
+        demographics=simulate_demographics(village.population),
         p_isolated=p_isolated,
         isolated_now=isolated_now,
         alternate_route_exists=alternate_route_exists,
