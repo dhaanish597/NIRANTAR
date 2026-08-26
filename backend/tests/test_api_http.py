@@ -2,9 +2,19 @@
 through real HTTP/WebSocket transport (BUILD_PLAN.md task 0.11)."""
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+HAS_REAL_AIZAWL_DATA = (
+    (_REPO_ROOT / "data" / "static" / "aizawl" / "cells.gpkg").is_file()
+    and (_REPO_ROOT / "data" / "static" / "aizawl" / "exposure.gpkg").is_file()
+    and (_REPO_ROOT / "data" / "osm" / "aizawl_graph.pkl").is_file()
+)
 
 
 def make_client() -> TestClient:
@@ -167,19 +177,27 @@ def test_get_audit_trail_returns_the_real_chain_for_a_live_ai_flagged_alert():
 
 def test_ws_ticks_eventually_shows_the_full_escalation_arc():
     """Proves the browser-facing path (not just the pipeline-level test) sees the same rising
-    p_fail arc that test_smoke_scenario.py proves at the pipeline level."""
+    p_fail arc that test_smoke_scenario.py proves at the pipeline level.
+
+    Reads `new_action_cards[*].stage` directly (the real escalation stage string an ActionCard
+    carries) rather than inferring a stage from `priorities[0].eps` — EPS is now a genuine
+    weighted composite (p_fail/population/RII/shelter, task 2.5), not a stand-in for p_fail, so an
+    eps>=0.75 threshold no longer means "RED" the way it did against Phase 0's stub pipeline
+    (where a single fake village's eps was p_fail verbatim). Requires real Aizawl static data
+    (gitignored) for real villages to exist at all — skipped, not faked, when it's absent, same
+    pattern as test_smoke_scenario.py's own HAS_REAL_AIZAWL_DATA."""
+    if not HAS_REAL_AIZAWL_DATA:
+        pytest.skip("requires real Aizawl static data")
+
     with make_client() as client:
         with client.websocket_connect("/ws/ticks") as ws:
             client.post("/api/replay/start", json={"scenario_id": "_smoke"})
             stages_seen = set()
             for _ in range(10):
                 message = ws.receive_json()
-                if message["scenario_id"] == "_smoke" and message["priorities"]:
-                    eps = message["priorities"][0]["eps"]
-                    if eps >= 0.75:
-                        stages_seen.add("RED")
-                    elif eps >= 0.5:
-                        stages_seen.add("ORANGE")
+                if message["scenario_id"] == "_smoke":
+                    for card in message["new_action_cards"]:
+                        stages_seen.add(card["stage"])
 
     assert "RED" in stages_seen
     assert "ORANGE" in stages_seen

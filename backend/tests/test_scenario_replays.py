@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-from app.decision.stub import escalation_stage
 from app.ingest.replay.scenario_source import ScenarioSource, build_scenario_clock, load_scenario
 from app.pipeline import Pipeline
 from app.schemas.mode import RunMode
@@ -17,6 +16,22 @@ from app.schemas.mode import RunMode
 SCENARIOS_DIR = Path(__file__).resolve().parents[2] / "data" / "scenarios"
 
 REAL_SCENARIO_IDS = ["aizawl-2024", "wayanad-2024", "tupul-2022"]
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+HAS_REAL_AIZAWL_DATA = (
+    (_REPO_ROOT / "data" / "static" / "aizawl" / "cells.gpkg").is_file()
+    and (_REPO_ROOT / "data" / "static" / "aizawl" / "exposure.gpkg").is_file()
+    and (_REPO_ROOT / "data" / "osm" / "aizawl_graph.pkl").is_file()
+)
+
+# A later session (1) wired pipeline.py to the real risk/impact/decision modules and (2) remapped
+# aizawl-2024.json's cell_ids (it shares the identical 9-cell set _smoke.json does) onto real
+# cells.gpkg cells — see pipeline.py's module docstring and grid.ts's
+# REMAPPED_REAL_CELL_POSITIONS. Tuirini (aizawl_054_046) is the lowest-terrain-floor of the 9 real
+# villages this touches — see test_smoke_scenario.py's own note on why that matters for tracking
+# a clean stage arc rather than `tick.priorities[0]`, whose order/membership isn't stable once
+# there are many real villages instead of one synthetic one.
+AIZAWL_TRACKED_VILLAGE_ID = "v_12249036273"
 
 
 async def run_scenario(scenario_id: str) -> tuple[list, Pipeline]:
@@ -66,14 +81,19 @@ async def test_every_tick_is_stamped_replay_and_reconstructed(scenario_id: str):
 
 
 @pytest.mark.parametrize("scenario_id", REAL_SCENARIO_IDS)
-async def test_every_tick_writes_exactly_one_audit_event_and_the_chain_is_unbroken(scenario_id: str):
+async def test_every_tick_writes_at_least_the_ai_flagged_audit_event_and_the_chain_is_unbroken(scenario_id: str):
+    """Every tick writes exactly one AI_FLAGGED event, PLUS whatever real ESCALATED events real
+    villages' stage transitions produced this tick (task 3.2) — for aizawl-2024 (real villages
+    wired via the cell-id remapping), multiple villages sharing correlated rainfall can genuinely
+    transition on the same tick, so "exactly one" is no longer the right assertion; "AI_FLAGGED is
+    always first, and the hash chain is unbroken across the WHOLE run" still is."""
     ticks, pipeline = await run_scenario(scenario_id)
     for tick in ticks:
-        assert len(tick.new_audit_events) == 1
+        assert len(tick.new_audit_events) >= 1
         assert tick.new_audit_events[0].kind == "AI_FLAGGED"
 
     events = pipeline.audit_log.events
-    assert len(events) == len(ticks)
+    assert len(events) >= len(ticks)
     for prev_event, event in zip(events, events[1:]):
         assert event.prev_hash == prev_event.hash
 
@@ -88,24 +108,51 @@ async def test_replaying_each_real_scenario_twice_is_byte_identical(scenario_id:
     assert [t.model_dump_json() for t in ticks_a] == [t.model_dump_json() for t in ticks_b]
 
 
+@pytest.mark.skipif(not HAS_REAL_AIZAWL_DATA, reason="requires real Aizawl static data")
 async def test_aizawl_2024_escalates_to_red_at_some_point():
     """The Aizawl scenario's rainfall (253.7mm/3days, peaking just before the documented ~6AM
-    quarry collapse) must actually be dramatic enough to escalate through the stub risk/decision
-    stages -- otherwise the replay would be visually inert, which defeats the point of a
-    case-study demo (CLAUDE.md's 8-minute arc explicitly needs cells to escalate on screen)."""
-    ticks, _pipeline = await run_scenario("aizawl-2024")
-    stages = [escalation_stage(tick.priorities[0].eps) for tick in ticks]
+    quarry collapse) must actually be dramatic enough to escalate a real village through the real
+    risk/decision stages -- otherwise the replay would be visually inert, which defeats the point
+    of a case-study demo (CLAUDE.md's 8-minute arc explicitly needs cells to escalate on screen).
+    Tracks a specific real village's stage per-tick, inside the tick loop — see
+    test_smoke_scenario.py's own note on why `EscalationStateMachine.current_stage()` must be read
+    per-tick, not in a separate loop after every tick has already run (a real bug caught there)."""
+    scenario = load_scenario(SCENARIOS_DIR / "aizawl-2024.json")
+    clock = build_scenario_clock(scenario)
+    source = ScenarioSource(scenario, clock, realtime=False)
+    pipeline = Pipeline()
+
+    stages = []
+    async for frame in source.frames():
+        pipeline.process(frame, mode=RunMode.REPLAY, scenario_id=scenario.id)
+        stages.append(pipeline.escalation.current_stage(AIZAWL_TRACKED_VILLAGE_ID))
+
     assert "RED" in stages or "ORANGE" in stages, (
-        "expected the stub pipeline to escalate at least to ORANGE somewhere in the Aizawl replay"
+        f"expected {AIZAWL_TRACKED_VILLAGE_ID} to reach at least ORANGE somewhere in the "
+        f"Aizawl replay; got stages {sorted(set(stages))}"
     )
 
 
-async def test_wayanad_2024_escalates_to_red_at_some_point():
-    """Wayanad's 572mm/48h is the most intense of the three reconstructed events -- it should
-    clearly escalate under even the Phase 0 linear rain_1h stub risk model."""
+async def test_wayanad_2024_cell_risk_still_rises_despite_the_documented_aoi_gap():
+    """Wayanad has no registered `config.AOIS` entry and no Phase-2 static data (a real, already-
+    documented gap — see this scenario's own `provenance.disclaimer` and BUILD_PLAN.md task 4.4's
+    notes) — pipeline.py's impact/decision stage degrades to empty for it (module docstring,
+    ruling 7), so `tick.priorities`/`tick.new_action_cards` are always `[]` here; asserting that
+    honestly, rather than indexing into an empty list (a real IndexError this test used to hit).
+    What IS still real for Wayanad: `risk/thresholds.py`'s I-D/E-D engine needs only rainfall, not
+    terrain, so `cell_risks` still reflects genuine risk — and 572mm/48h is intense enough that it
+    should saturate the threshold-only fallback to p_fail=1.0 somewhere in the replay."""
     ticks, _pipeline = await run_scenario("wayanad-2024")
-    stages = [escalation_stage(tick.priorities[0].eps) for tick in ticks]
-    assert "RED" in stages
+
+    assert all(tick.priorities == [] for tick in ticks), (
+        "expected empty priorities for the unregistered wayanad AOI — if this now fails, the AOI "
+        "gap noted in aizawl-2024's sibling scenarios may have been fixed; update this test"
+    )
+    max_p_fails = [max((r.p_fail for r in tick.cell_risks), default=0.0) for tick in ticks]
+    assert max(max_p_fails) == pytest.approx(1.0), (
+        f"expected Wayanad's severe rainfall to saturate threshold_exceedance to 1.0 somewhere; "
+        f"got a max of {max(max_p_fails)}"
+    )
 
 
 async def test_tupul_2022_ground_truth_captures_the_low_to_moderate_susceptibility_fact():

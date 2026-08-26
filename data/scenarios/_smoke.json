@@ -4,9 +4,9 @@
   "held_out_of_training": false,
   "provenance": {
     "confidence": "fabricated",
-    "method": "Hand-written fixture for CI and local dev. Not derived from any real event.",
+    "method": "Hand-written fixture for CI and local dev. Not derived from any real event. Rainfall values redesigned in a later session (see BUILD_PLAN.md) to produce a genuine GREEN->YELLOW->ORANGE->RED arc under the REAL risk/thresholds.py I-D/E-D engine (the original values, tuned only against the Phase 0 stub formula, saturated the real engine from frame 0 once real modules were wired in) -- rain_6h/24h/72h are physically monotonic partial sums (1h portion + a tapering prior contribution), not a real storm hyetograph; see the smoke.json remapping commit for the exact derivation.",
     "sources": [],
-    "disclaimer": "This is a fabricated smoke-test scenario, not a reconstruction of a real disaster. Used forever as the Phase 0 CI smoke test (BUILD_PLAN.md task 0.14) — do not delete."
+    "disclaimer": "This is a fabricated smoke-test scenario, not a reconstruction of a real disaster. Used forever as the Phase 0 CI smoke test (BUILD_PLAN.md task 0.14) \u2014 do not delete. Cell ids and rainfall figures redesigned for the real pipeline in a later session -- see BUILD_PLAN.md."
   },
   "clock": {
     "start": "2025-01-01T00:00:00+05:30",
@@ -18,191 +18,511 @@
     {
       "t": "2025-01-01T00:00:00+05:30",
       "defaults": {
-        "rain_6h": 6.0, "rain_24h": 20.0, "rain_72h": 55.0,
-        "antecedent_7d": 40.0, "antecedent_15d": 70.0, "antecedent_30d": 130.0,
-        "soil_moisture": 0.30, "insar_velocity_mm_yr": null
+        "rain_6h": 0.75,
+        "rain_24h": 1.75,
+        "rain_72h": 2.25,
+        "antecedent_7d": 10.0,
+        "antecedent_15d": 30.0,
+        "antecedent_30d": 70.0,
+        "soil_moisture": 0.22,
+        "insar_velocity_mm_yr": null
       },
       "cells": [
-        { "cell_id": "aizawl_401", "rain_1h": 2.0 },
-        { "cell_id": "aizawl_402", "rain_1h": 2.0 },
-        { "cell_id": "aizawl_403", "rain_1h": 2.0 },
-        { "cell_id": "aizawl_411", "rain_1h": 2.0 },
-        { "cell_id": "aizawl_412", "rain_1h": 2.0 },
-        { "cell_id": "aizawl_413", "rain_1h": 2.0 },
-        { "cell_id": "aizawl_421", "rain_1h": 2.0 },
-        { "cell_id": "aizawl_422", "rain_1h": 2.0 },
-        { "cell_id": "aizawl_423", "rain_1h": 2.0 }
+        {
+          "cell_id": "aizawl_012_001",
+          "rain_1h": 0.25
+        },
+        {
+          "cell_id": "aizawl_039_050",
+          "rain_1h": 0.25
+        },
+        {
+          "cell_id": "aizawl_044_048",
+          "rain_1h": 0.25
+        },
+        {
+          "cell_id": "aizawl_040_026",
+          "rain_1h": 0.25
+        },
+        {
+          "cell_id": "aizawl_022_001",
+          "rain_1h": 0.25
+        },
+        {
+          "cell_id": "aizawl_003_024",
+          "rain_1h": 0.25
+        },
+        {
+          "cell_id": "aizawl_026_040",
+          "rain_1h": 0.25
+        },
+        {
+          "cell_id": "aizawl_029_040",
+          "rain_1h": 0.25
+        },
+        {
+          "cell_id": "aizawl_054_046",
+          "rain_1h": 0.25
+        }
       ]
     },
     {
       "t": "2025-01-01T01:00:00+05:30",
       "defaults": {
-        "rain_6h": 9.0, "rain_24h": 24.0, "rain_72h": 58.0,
-        "antecedent_7d": 40.0, "antecedent_15d": 70.0, "antecedent_30d": 130.0,
-        "soil_moisture": 0.31, "insar_velocity_mm_yr": null
+        "rain_6h": 1.5,
+        "rain_24h": 3.5,
+        "rain_72h": 4.5,
+        "antecedent_7d": 14.0,
+        "antecedent_15d": 36.0,
+        "antecedent_30d": 78.0,
+        "soil_moisture": 0.24,
+        "insar_velocity_mm_yr": null
       },
       "cells": [
-        { "cell_id": "aizawl_401", "rain_1h": 5.0 },
-        { "cell_id": "aizawl_402", "rain_1h": 5.0 },
-        { "cell_id": "aizawl_403", "rain_1h": 5.0 },
-        { "cell_id": "aizawl_411", "rain_1h": 5.0 },
-        { "cell_id": "aizawl_412", "rain_1h": 5.0 },
-        { "cell_id": "aizawl_413", "rain_1h": 5.0 },
-        { "cell_id": "aizawl_421", "rain_1h": 5.0 },
-        { "cell_id": "aizawl_422", "rain_1h": 5.0 },
-        { "cell_id": "aizawl_423", "rain_1h": 5.0 }
+        {
+          "cell_id": "aizawl_012_001",
+          "rain_1h": 0.5
+        },
+        {
+          "cell_id": "aizawl_039_050",
+          "rain_1h": 0.5
+        },
+        {
+          "cell_id": "aizawl_044_048",
+          "rain_1h": 0.5
+        },
+        {
+          "cell_id": "aizawl_040_026",
+          "rain_1h": 0.5
+        },
+        {
+          "cell_id": "aizawl_022_001",
+          "rain_1h": 0.5
+        },
+        {
+          "cell_id": "aizawl_003_024",
+          "rain_1h": 0.5
+        },
+        {
+          "cell_id": "aizawl_026_040",
+          "rain_1h": 0.5
+        },
+        {
+          "cell_id": "aizawl_029_040",
+          "rain_1h": 0.5
+        },
+        {
+          "cell_id": "aizawl_054_046",
+          "rain_1h": 0.5
+        }
       ]
     },
     {
       "t": "2025-01-01T02:00:00+05:30",
       "defaults": {
-        "rain_6h": 13.0, "rain_24h": 29.0, "rain_72h": 62.0,
-        "antecedent_7d": 41.0, "antecedent_15d": 71.0, "antecedent_30d": 131.0,
-        "soil_moisture": 0.33, "insar_velocity_mm_yr": null
+        "rain_6h": 2.7,
+        "rain_24h": 6.3,
+        "rain_72h": 8.1,
+        "antecedent_7d": 18.0,
+        "antecedent_15d": 43.0,
+        "antecedent_30d": 87.0,
+        "soil_moisture": 0.27,
+        "insar_velocity_mm_yr": null
       },
       "cells": [
-        { "cell_id": "aizawl_401", "rain_1h": 8.0 },
-        { "cell_id": "aizawl_402", "rain_1h": 8.0 },
-        { "cell_id": "aizawl_403", "rain_1h": 8.0 },
-        { "cell_id": "aizawl_411", "rain_1h": 8.0 },
-        { "cell_id": "aizawl_412", "rain_1h": 8.0 },
-        { "cell_id": "aizawl_413", "rain_1h": 8.0 },
-        { "cell_id": "aizawl_421", "rain_1h": 8.0 },
-        { "cell_id": "aizawl_422", "rain_1h": 8.0 },
-        { "cell_id": "aizawl_423", "rain_1h": 8.0 }
+        {
+          "cell_id": "aizawl_012_001",
+          "rain_1h": 0.9
+        },
+        {
+          "cell_id": "aizawl_039_050",
+          "rain_1h": 0.9
+        },
+        {
+          "cell_id": "aizawl_044_048",
+          "rain_1h": 0.9
+        },
+        {
+          "cell_id": "aizawl_040_026",
+          "rain_1h": 0.9
+        },
+        {
+          "cell_id": "aizawl_022_001",
+          "rain_1h": 0.9
+        },
+        {
+          "cell_id": "aizawl_003_024",
+          "rain_1h": 0.9
+        },
+        {
+          "cell_id": "aizawl_026_040",
+          "rain_1h": 0.9
+        },
+        {
+          "cell_id": "aizawl_029_040",
+          "rain_1h": 0.9
+        },
+        {
+          "cell_id": "aizawl_054_046",
+          "rain_1h": 0.9
+        }
       ]
     },
     {
       "t": "2025-01-01T03:00:00+05:30",
       "defaults": {
-        "rain_6h": 18.0, "rain_24h": 35.0, "rain_72h": 67.0,
-        "antecedent_7d": 42.0, "antecedent_15d": 72.0, "antecedent_30d": 132.0,
-        "soil_moisture": 0.36, "insar_velocity_mm_yr": null
+        "rain_6h": 4.2,
+        "rain_24h": 9.8,
+        "rain_72h": 12.6,
+        "antecedent_7d": 23.0,
+        "antecedent_15d": 51.0,
+        "antecedent_30d": 97.0,
+        "soil_moisture": 0.3,
+        "insar_velocity_mm_yr": null
       },
       "cells": [
-        { "cell_id": "aizawl_401", "rain_1h": 11.0 },
-        { "cell_id": "aizawl_402", "rain_1h": 11.0 },
-        { "cell_id": "aizawl_403", "rain_1h": 11.0 },
-        { "cell_id": "aizawl_411", "rain_1h": 11.0 },
-        { "cell_id": "aizawl_412", "rain_1h": 11.0 },
-        { "cell_id": "aizawl_413", "rain_1h": 11.0 },
-        { "cell_id": "aizawl_421", "rain_1h": 11.0 },
-        { "cell_id": "aizawl_422", "rain_1h": 11.0 },
-        { "cell_id": "aizawl_423", "rain_1h": 11.0 }
+        {
+          "cell_id": "aizawl_012_001",
+          "rain_1h": 1.4
+        },
+        {
+          "cell_id": "aizawl_039_050",
+          "rain_1h": 1.4
+        },
+        {
+          "cell_id": "aizawl_044_048",
+          "rain_1h": 1.4
+        },
+        {
+          "cell_id": "aizawl_040_026",
+          "rain_1h": 1.4
+        },
+        {
+          "cell_id": "aizawl_022_001",
+          "rain_1h": 1.4
+        },
+        {
+          "cell_id": "aizawl_003_024",
+          "rain_1h": 1.4
+        },
+        {
+          "cell_id": "aizawl_026_040",
+          "rain_1h": 1.4
+        },
+        {
+          "cell_id": "aizawl_029_040",
+          "rain_1h": 1.4
+        },
+        {
+          "cell_id": "aizawl_054_046",
+          "rain_1h": 1.4
+        }
       ]
     },
     {
       "t": "2025-01-01T04:00:00+05:30",
       "defaults": {
-        "rain_6h": 24.0, "rain_24h": 42.0, "rain_72h": 73.0,
-        "antecedent_7d": 43.0, "antecedent_15d": 73.0, "antecedent_30d": 133.0,
-        "soil_moisture": 0.40, "insar_velocity_mm_yr": null
+        "rain_6h": 6.0,
+        "rain_24h": 14.0,
+        "rain_72h": 18.0,
+        "antecedent_7d": 28.0,
+        "antecedent_15d": 60.0,
+        "antecedent_30d": 108.0,
+        "soil_moisture": 0.34,
+        "insar_velocity_mm_yr": null
       },
       "cells": [
-        { "cell_id": "aizawl_401", "rain_1h": 14.0 },
-        { "cell_id": "aizawl_402", "rain_1h": 14.0 },
-        { "cell_id": "aizawl_403", "rain_1h": 14.0 },
-        { "cell_id": "aizawl_411", "rain_1h": 14.0 },
-        { "cell_id": "aizawl_412", "rain_1h": 14.0 },
-        { "cell_id": "aizawl_413", "rain_1h": 14.0 },
-        { "cell_id": "aizawl_421", "rain_1h": 14.0 },
-        { "cell_id": "aizawl_422", "rain_1h": 14.0 },
-        { "cell_id": "aizawl_423", "rain_1h": 14.0 }
+        {
+          "cell_id": "aizawl_012_001",
+          "rain_1h": 2.0
+        },
+        {
+          "cell_id": "aizawl_039_050",
+          "rain_1h": 2.0
+        },
+        {
+          "cell_id": "aizawl_044_048",
+          "rain_1h": 2.0
+        },
+        {
+          "cell_id": "aizawl_040_026",
+          "rain_1h": 2.0
+        },
+        {
+          "cell_id": "aizawl_022_001",
+          "rain_1h": 2.0
+        },
+        {
+          "cell_id": "aizawl_003_024",
+          "rain_1h": 2.0
+        },
+        {
+          "cell_id": "aizawl_026_040",
+          "rain_1h": 2.0
+        },
+        {
+          "cell_id": "aizawl_029_040",
+          "rain_1h": 2.0
+        },
+        {
+          "cell_id": "aizawl_054_046",
+          "rain_1h": 2.0
+        }
       ]
     },
     {
       "t": "2025-01-01T05:00:00+05:30",
       "defaults": {
-        "rain_6h": 31.0, "rain_24h": 50.0, "rain_72h": 80.0,
-        "antecedent_7d": 44.0, "antecedent_15d": 74.0, "antecedent_30d": 134.0,
-        "soil_moisture": 0.45, "insar_velocity_mm_yr": null
+        "rain_6h": 7.8,
+        "rain_24h": 18.2,
+        "rain_72h": 23.4,
+        "antecedent_7d": 34.0,
+        "antecedent_15d": 70.0,
+        "antecedent_30d": 120.0,
+        "soil_moisture": 0.38,
+        "insar_velocity_mm_yr": null
       },
       "cells": [
-        { "cell_id": "aizawl_401", "rain_1h": 17.0 },
-        { "cell_id": "aizawl_402", "rain_1h": 17.0 },
-        { "cell_id": "aizawl_403", "rain_1h": 17.0 },
-        { "cell_id": "aizawl_411", "rain_1h": 17.0 },
-        { "cell_id": "aizawl_412", "rain_1h": 17.0 },
-        { "cell_id": "aizawl_413", "rain_1h": 17.0 },
-        { "cell_id": "aizawl_421", "rain_1h": 17.0 },
-        { "cell_id": "aizawl_422", "rain_1h": 17.0 },
-        { "cell_id": "aizawl_423", "rain_1h": 17.0 }
+        {
+          "cell_id": "aizawl_012_001",
+          "rain_1h": 2.6
+        },
+        {
+          "cell_id": "aizawl_039_050",
+          "rain_1h": 2.6
+        },
+        {
+          "cell_id": "aizawl_044_048",
+          "rain_1h": 2.6
+        },
+        {
+          "cell_id": "aizawl_040_026",
+          "rain_1h": 2.6
+        },
+        {
+          "cell_id": "aizawl_022_001",
+          "rain_1h": 2.6
+        },
+        {
+          "cell_id": "aizawl_003_024",
+          "rain_1h": 2.6
+        },
+        {
+          "cell_id": "aizawl_026_040",
+          "rain_1h": 2.6
+        },
+        {
+          "cell_id": "aizawl_029_040",
+          "rain_1h": 2.6
+        },
+        {
+          "cell_id": "aizawl_054_046",
+          "rain_1h": 2.6
+        }
       ]
     },
     {
       "t": "2025-01-01T06:00:00+05:30",
       "defaults": {
-        "rain_6h": 39.0, "rain_24h": 59.0, "rain_72h": 88.0,
-        "antecedent_7d": 45.0, "antecedent_15d": 75.0, "antecedent_30d": 135.0,
-        "soil_moisture": 0.51, "insar_velocity_mm_yr": null
+        "rain_6h": 9.75,
+        "rain_24h": 22.75,
+        "rain_72h": 29.25,
+        "antecedent_7d": 41.0,
+        "antecedent_15d": 81.0,
+        "antecedent_30d": 133.0,
+        "soil_moisture": 0.43,
+        "insar_velocity_mm_yr": null
       },
       "cells": [
-        { "cell_id": "aizawl_401", "rain_1h": 20.0 },
-        { "cell_id": "aizawl_402", "rain_1h": 20.0 },
-        { "cell_id": "aizawl_403", "rain_1h": 20.0 },
-        { "cell_id": "aizawl_411", "rain_1h": 20.0 },
-        { "cell_id": "aizawl_412", "rain_1h": 20.0 },
-        { "cell_id": "aizawl_413", "rain_1h": 20.0 },
-        { "cell_id": "aizawl_421", "rain_1h": 20.0 },
-        { "cell_id": "aizawl_422", "rain_1h": 20.0 },
-        { "cell_id": "aizawl_423", "rain_1h": 20.0 }
+        {
+          "cell_id": "aizawl_012_001",
+          "rain_1h": 3.25
+        },
+        {
+          "cell_id": "aizawl_039_050",
+          "rain_1h": 3.25
+        },
+        {
+          "cell_id": "aizawl_044_048",
+          "rain_1h": 3.25
+        },
+        {
+          "cell_id": "aizawl_040_026",
+          "rain_1h": 3.25
+        },
+        {
+          "cell_id": "aizawl_022_001",
+          "rain_1h": 3.25
+        },
+        {
+          "cell_id": "aizawl_003_024",
+          "rain_1h": 3.25
+        },
+        {
+          "cell_id": "aizawl_026_040",
+          "rain_1h": 3.25
+        },
+        {
+          "cell_id": "aizawl_029_040",
+          "rain_1h": 3.25
+        },
+        {
+          "cell_id": "aizawl_054_046",
+          "rain_1h": 3.25
+        }
       ]
     },
     {
       "t": "2025-01-01T07:00:00+05:30",
       "defaults": {
-        "rain_6h": 48.0, "rain_24h": 69.0, "rain_72h": 97.0,
-        "antecedent_7d": 46.0, "antecedent_15d": 76.0, "antecedent_30d": 136.0,
-        "soil_moisture": 0.58, "insar_velocity_mm_yr": null
+        "rain_6h": 12.0,
+        "rain_24h": 28.0,
+        "rain_72h": 36.0,
+        "antecedent_7d": 49.0,
+        "antecedent_15d": 93.0,
+        "antecedent_30d": 147.0,
+        "soil_moisture": 0.48,
+        "insar_velocity_mm_yr": null
       },
       "cells": [
-        { "cell_id": "aizawl_401", "rain_1h": 23.0 },
-        { "cell_id": "aizawl_402", "rain_1h": 23.0 },
-        { "cell_id": "aizawl_403", "rain_1h": 23.0 },
-        { "cell_id": "aizawl_411", "rain_1h": 23.0 },
-        { "cell_id": "aizawl_412", "rain_1h": 23.0 },
-        { "cell_id": "aizawl_413", "rain_1h": 23.0 },
-        { "cell_id": "aizawl_421", "rain_1h": 23.0 },
-        { "cell_id": "aizawl_422", "rain_1h": 23.0 },
-        { "cell_id": "aizawl_423", "rain_1h": 23.0 }
+        {
+          "cell_id": "aizawl_012_001",
+          "rain_1h": 4.0
+        },
+        {
+          "cell_id": "aizawl_039_050",
+          "rain_1h": 4.0
+        },
+        {
+          "cell_id": "aizawl_044_048",
+          "rain_1h": 4.0
+        },
+        {
+          "cell_id": "aizawl_040_026",
+          "rain_1h": 4.0
+        },
+        {
+          "cell_id": "aizawl_022_001",
+          "rain_1h": 4.0
+        },
+        {
+          "cell_id": "aizawl_003_024",
+          "rain_1h": 4.0
+        },
+        {
+          "cell_id": "aizawl_026_040",
+          "rain_1h": 4.0
+        },
+        {
+          "cell_id": "aizawl_029_040",
+          "rain_1h": 4.0
+        },
+        {
+          "cell_id": "aizawl_054_046",
+          "rain_1h": 4.0
+        }
       ]
     },
     {
       "t": "2025-01-01T08:00:00+05:30",
       "defaults": {
-        "rain_6h": 58.0, "rain_24h": 80.0, "rain_72h": 107.0,
-        "antecedent_7d": 47.0, "antecedent_15d": 77.0, "antecedent_30d": 137.0,
-        "soil_moisture": 0.66, "insar_velocity_mm_yr": null
+        "rain_6h": 14.25,
+        "rain_24h": 33.25,
+        "rain_72h": 42.75,
+        "antecedent_7d": 58.0,
+        "antecedent_15d": 106.0,
+        "antecedent_30d": 162.0,
+        "soil_moisture": 0.54,
+        "insar_velocity_mm_yr": null
       },
       "cells": [
-        { "cell_id": "aizawl_401", "rain_1h": 26.0 },
-        { "cell_id": "aizawl_402", "rain_1h": 26.0 },
-        { "cell_id": "aizawl_403", "rain_1h": 26.0 },
-        { "cell_id": "aizawl_411", "rain_1h": 26.0 },
-        { "cell_id": "aizawl_412", "rain_1h": 26.0 },
-        { "cell_id": "aizawl_413", "rain_1h": 26.0 },
-        { "cell_id": "aizawl_421", "rain_1h": 26.0 },
-        { "cell_id": "aizawl_422", "rain_1h": 26.0 },
-        { "cell_id": "aizawl_423", "rain_1h": 26.0 }
+        {
+          "cell_id": "aizawl_012_001",
+          "rain_1h": 4.75
+        },
+        {
+          "cell_id": "aizawl_039_050",
+          "rain_1h": 4.75
+        },
+        {
+          "cell_id": "aizawl_044_048",
+          "rain_1h": 4.75
+        },
+        {
+          "cell_id": "aizawl_040_026",
+          "rain_1h": 4.75
+        },
+        {
+          "cell_id": "aizawl_022_001",
+          "rain_1h": 4.75
+        },
+        {
+          "cell_id": "aizawl_003_024",
+          "rain_1h": 4.75
+        },
+        {
+          "cell_id": "aizawl_026_040",
+          "rain_1h": 4.75
+        },
+        {
+          "cell_id": "aizawl_029_040",
+          "rain_1h": 4.75
+        },
+        {
+          "cell_id": "aizawl_054_046",
+          "rain_1h": 4.75
+        }
       ]
     },
     {
       "t": "2025-01-01T09:00:00+05:30",
       "defaults": {
-        "rain_6h": 69.0, "rain_24h": 92.0, "rain_72h": 118.0,
-        "antecedent_7d": 48.0, "antecedent_15d": 78.0, "antecedent_30d": 138.0,
-        "soil_moisture": 0.74, "insar_velocity_mm_yr": null
+        "rain_6h": 17.25,
+        "rain_24h": 40.25,
+        "rain_72h": 51.75,
+        "antecedent_7d": 68.0,
+        "antecedent_15d": 120.0,
+        "antecedent_30d": 178.0,
+        "soil_moisture": 0.61,
+        "insar_velocity_mm_yr": null
       },
       "cells": [
-        { "cell_id": "aizawl_401", "rain_1h": 29.0 },
-        { "cell_id": "aizawl_402", "rain_1h": 29.0 },
-        { "cell_id": "aizawl_403", "rain_1h": 29.0 },
-        { "cell_id": "aizawl_411", "rain_1h": 29.0 },
-        { "cell_id": "aizawl_412", "rain_1h": 29.0 },
-        { "cell_id": "aizawl_413", "rain_1h": 29.0 },
-        { "cell_id": "aizawl_421", "rain_1h": 29.0 },
-        { "cell_id": "aizawl_422", "rain_1h": 29.0 },
-        { "cell_id": "aizawl_423", "rain_1h": 29.0 }
+        {
+          "cell_id": "aizawl_012_001",
+          "rain_1h": 5.75
+        },
+        {
+          "cell_id": "aizawl_039_050",
+          "rain_1h": 5.75
+        },
+        {
+          "cell_id": "aizawl_044_048",
+          "rain_1h": 5.75
+        },
+        {
+          "cell_id": "aizawl_040_026",
+          "rain_1h": 5.75
+        },
+        {
+          "cell_id": "aizawl_022_001",
+          "rain_1h": 5.75
+        },
+        {
+          "cell_id": "aizawl_003_024",
+          "rain_1h": 5.75
+        },
+        {
+          "cell_id": "aizawl_026_040",
+          "rain_1h": 5.75
+        },
+        {
+          "cell_id": "aizawl_029_040",
+          "rain_1h": 5.75
+        },
+        {
+          "cell_id": "aizawl_054_046",
+          "rain_1h": 5.75
+        }
       ]
     }
   ]
