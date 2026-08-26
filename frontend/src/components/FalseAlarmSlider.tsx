@@ -4,10 +4,12 @@ import { getEvalReport, operatingPoints } from '../lib/evalReport'
 /**
  * BUILD_PLAN.md task 5.6 — the false-alarm-cost slider.
  *
- * There is no real DDMA console yet (task 3.7 is not built — BUILD_PLAN.md Phase 3 is still
- * mostly unchecked). Built here as a self-contained panel that can be dropped into that console
- * later without rework, and placed in the right rail for now (RightRail.tsx), per this agent's
- * task brief.
+ * Built (before task 3.7's real DDMA Console existed) as a self-contained panel placed in the
+ * right rail (RightRail.tsx), so it stayed visible on the main operational screen rather than
+ * being buried inside the console. `DdmaConsole.tsx` (task 3.7) is now real and reachable via the
+ * "DDMA Console" button, but this panel is left here rather than moved — it is a general
+ * risk-threshold explainer relevant to the whole operational view, not specific to the
+ * Approve/Modify/Reject workflow the console adds.
  *
  * RULING (documented, not silently decided): the panel snaps to the three REAL operating
  * thresholds measured in `data/models/eval_report.md` §5/§6 (0.30 / 0.50 / 0.70) — it does not
@@ -54,8 +56,8 @@ export function FalseAlarmSlider() {
         False-alarm-cost slider
       </h2>
       <p className="mb-2 text-[11px] text-slate-500">
-        DDMA console (preview) — task 3.7&apos;s real console does not exist yet; this panel is
-        self-contained so it can be dropped in later.
+        Operational-view risk threshold explainer — see the DDMA Console (task 3.7) for the real
+        per-recommendation Approve/Modify/Reject workflow.
       </p>
 
       <input

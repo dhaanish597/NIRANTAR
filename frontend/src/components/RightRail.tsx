@@ -42,8 +42,9 @@ export function RightRail() {
       {/* BUILD_PLAN.md task 5.7: SHAP bars in plain language, per-input provenance, confidence. */}
       <ExplainabilityPanel />
 
-      {/* BUILD_PLAN.md task 5.6: false-alarm-cost slider, DDMA-console-shaped panel (task 3.7's
-          real console doesn't exist yet). */}
+      {/* BUILD_PLAN.md task 5.6: false-alarm-cost slider, a general risk-threshold explainer for
+          the operational view. The real per-recommendation Approve/Modify/Reject workflow is the
+          DDMA Console (task 3.7, DdmaConsole.tsx, reachable via App.tsx's "DDMA Console" button). */}
       <FalseAlarmSlider />
     </aside>
   )
