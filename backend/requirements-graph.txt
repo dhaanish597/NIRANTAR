@@ -1,0 +1,19 @@
+# Phase 2 road-graph dependencies (BUILD_PLAN.md task 2.1, scripts/build_road_graph.py, and
+# impact/road_graph.py + impact/isolation.py's in-process NetworkX connectivity tests).
+# Separate from requirements-geo.txt so people not touching the road graph don't pull in OSMnx
+# before Phase 2 needs it — same reasoning requirements-ingest.txt/requirements-db.txt give for
+# their own splits.
+#
+# OSMnx itself is used ONLY in scripts/build_road_graph.py (CLAUDE.md §2 / BUILD_PLAN.md task
+# 2.1: "OSMnx runs only here, never at request time"). impact/road_graph.py and
+# impact/isolation.py consume the plain NetworkX graph the script already built and pickled —
+# they need networkx, not osmnx.
+
+-r requirements-geo.txt
+
+networkx>=3.3,<4.0
+# Pinned to the 2.x line actually available/installed in this environment at the time this task
+# was done (osmnx 1.9 was the version noted as the target in an earlier plan comment, but 2.1.1
+# is what `pip install osmnx` resolved to here) — its `graph_from_bbox(bbox=(left,bottom,right,
+# top), ...)` single-tuple signature is what scripts/build_road_graph.py is written against.
+osmnx>=2.0,<3.0

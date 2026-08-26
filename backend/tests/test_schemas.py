@@ -233,6 +233,7 @@ class TestTick:
     def test_valid_empty_tick(self):
         tick = TickResult(t=NOW, mode=RunMode.REPLAY, scenario_id="_smoke", aoi_id="aizawl")
         assert tick.cell_risks == []
+        assert tick.runouts == []
         assert tick.is_reconstructed is False
 
     def test_tick_round_trips_through_json(self):
@@ -246,4 +247,21 @@ class TestTick:
         )
         payload = tick.model_dump_json()
         restored = TickResult.model_validate_json(payload)
+        assert restored == tick
+
+    def test_runouts_field_carries_real_envelopes_and_round_trips(self):
+        """BUILD_PLAN.md task 2.2/2.3's schema-change ruling: `runouts` closes the gap CLAUDE.md
+        §11 flagged since Phase 0 (RunoutEnvelope had no field on TickResult, so impact/stub.py's
+        computed envelopes never reached /ws/ticks)."""
+        envelope = RunoutEnvelope(
+            source_cell_id="aizawl_001_001",
+            geometry={"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]},
+            p_fail=0.8,
+            method="angle_of_reach_25deg_corominas1996_spread_15deg",
+        )
+        tick = TickResult(
+            t=NOW, mode=RunMode.REPLAY, scenario_id="_smoke", aoi_id="aizawl", runouts=[envelope],
+        )
+        assert tick.runouts == [envelope]
+        restored = TickResult.model_validate_json(tick.model_dump_json())
         assert restored == tick
