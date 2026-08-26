@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 import { DDMA_OFFICER_ID_PLACEHOLDER, recommendationContext, type DdmaDecisionKind } from '../lib/ddma'
 import { useTickStore } from '../store/useTickStore'
 import type { ActionCard, AuditEvent, EscalationStage } from '../types/schemas'
+import { MeshPropagationVisual } from './MeshPropagationVisual'
 
 interface DecisionState {
   status: 'submitting' | 'done' | 'error'
@@ -36,6 +37,12 @@ interface DecisionState {
  * No officer login/credential system exists anywhere in this codebase — `officer_id` is a plain,
  * clearly-labelled placeholder text field (`lib/ddma.ts::DDMA_OFFICER_ID_PLACEHOLDER`), never
  * presented as a real DDMA identity, per CLAUDE.md's explicit rule against inventing one.
+ *
+ * BUILD_PLAN.md task 5.5 addition (this session): `MeshPropagationVisual` below the officer-id
+ * row — the last-mile-reach preview for villages with no tower coverage, placed here (not Village
+ * View) since it's a DDMA-operational "how would this actually reach people" concern, not a
+ * citizen-facing screen. See that component's own docstring for the real-parameters-but-
+ * simulated-outcome data-source ruling.
  */
 export function DdmaConsole({ onBack }: { onBack: () => void }) {
   const actionCards = useTickStore((s) => s.actionCards)
@@ -102,6 +109,12 @@ export function DdmaConsole({ onBack }: { onBack: () => void }) {
         <span className="text-xs text-slate-500">
           Placeholder — no real DDMA login/credential system exists yet.
         </span>
+      </div>
+
+      {/* BUILD_PLAN.md task 5.5: last-mile reach preview for villages with no tower coverage —
+          see MeshPropagationVisual.tsx for the real-parameters-but-simulated-outcome ruling. */}
+      <div className="mb-6 rounded border border-white/10 bg-white/5 p-4">
+        <MeshPropagationVisual />
       </div>
 
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
