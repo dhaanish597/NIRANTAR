@@ -49,6 +49,12 @@ interface TickStoreState {
    * (ReplayControlBar) and the modal itself (CounterfactualScorecard, rendered from App.tsx) can
    * read/set it without prop drilling. */
   scorecardOpen: boolean
+  /** BUILD_PLAN.md task 3.8: which `alert_id` the Audit Trail view modal should fetch and
+   * display, or `null` when closed. Store-owned (not component-local) for the same reason
+   * `selectedVillageId`/`scorecardOpen` are: several independent entry points (a DDMA Console
+   * recommendation row, the Village View action card) all need to be able to open the SAME
+   * modal (rendered once from App.tsx) at a specific alert_id. */
+  auditTrailAlertId: string | null
 
   connect: () => void
   disconnect: () => void
@@ -61,6 +67,8 @@ interface TickStoreState {
   selectVillage: (villageId: string | null) => void
   openScorecard: () => void
   closeScorecard: () => void
+  openAuditTrail: (alertId: string) => void
+  closeAuditTrail: () => void
 }
 
 let disconnectSocket: (() => void) | null = null
@@ -81,6 +89,7 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
   error: null,
   selectedVillageId: null,
   scorecardOpen: false,
+  auditTrailAlertId: null,
 
   connect: () => {
     if (disconnectSocket) return // already connected
@@ -149,4 +158,6 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
   selectVillage: (villageId: string | null) => set({ selectedVillageId: villageId }),
   openScorecard: () => set({ scorecardOpen: true }),
   closeScorecard: () => set({ scorecardOpen: false }),
+  openAuditTrail: (alertId: string) => set({ auditTrailAlertId: alertId }),
+  closeAuditTrail: () => set({ auditTrailAlertId: null }),
 }))

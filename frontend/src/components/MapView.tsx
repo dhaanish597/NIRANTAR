@@ -1,3 +1,4 @@
+import type { Geometry } from 'geojson'
 import { type GeoJSONSource, MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef } from 'react'
@@ -9,6 +10,14 @@ import { useTickStore } from '../store/useTickStore'
 const SOURCE_ID = 'risk-cells'
 const FILL_LAYER_ID = 'risk-cells-fill'
 const OUTLINE_LAYER_ID = 'risk-cells-outline'
+
+// BUILD_PLAN.md task 3.10 (Village View): "an offline map with the route drawn". Rather than
+// build a second map implementation, this is an OPTIONAL extra layer on the SAME self-contained
+// MapView instance every other screen already uses (CLAUDE.md rule 10 — no external tile
+// requests, unchanged). Only rendered when a caller passes real route geometry
+// (decision/routing.py's `EvacuationRoute.geometry`, via `ActionCard.route.geometry`).
+const ROUTE_SOURCE_ID = 'evac-route'
+const ROUTE_LAYER_ID = 'evac-route-line'
 
 // BUILD_PLAN.md task 2.7: road layer coloured by p_blocked, villages as ranked pins. Both draw
 // synthetic geometry (lib/roads.ts, lib/villages.ts) — see those files' docstrings for why: the
@@ -25,7 +34,7 @@ const VILLAGE_LAYER_ID = 'villages-circle'
 // AOI load" path instead of relying on the fallback matching.
 const FALLBACK_CENTER: [number, number] = [92.7173, 23.7307]
 
-export function MapView() {
+export function MapView({ routeGeometry = null }: { routeGeometry?: Geometry | null } = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const hasCenteredOnAoiRef = useRef(false)
@@ -105,6 +114,18 @@ export function MapView() {
         },
       })
 
+      map.addSource(ROUTE_SOURCE_ID, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: ROUTE_LAYER_ID,
+        type: 'line',
+        source: ROUTE_SOURCE_ID,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#38bdf8', 'line-width': 4, 'line-dasharray': [0.2, 1.5] },
+      })
+
       // Task 2.8: clicking a village pin opens VillageDetailDrawer via the shared store action.
       map.on('click', VILLAGE_LAYER_ID, (event) => {
         const villageId = event.features?.[0]?.properties?.village_id
@@ -150,6 +171,20 @@ export function MapView() {
     if (map.isStyleLoaded()) applyData()
     else map.once('load', applyData)
   }, [cellRisks, roadRisks, priorities, isolations, aoi])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const applyRoute = () => {
+      const routeSource = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined
+      routeSource?.setData({
+        type: 'FeatureCollection',
+        features: routeGeometry ? [{ type: 'Feature', geometry: routeGeometry, properties: {} }] : [],
+      })
+    }
+    if (map.isStyleLoaded()) applyRoute()
+    else map.once('load', applyRoute)
+  }, [routeGeometry])
 
   return <div ref={containerRef} className="h-full w-full" />
 }

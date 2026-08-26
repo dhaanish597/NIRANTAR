@@ -7,16 +7,26 @@ pause()/resume()/set_speed() and `ingest/replay/scenario_source.py`'s already-re
 ScenarioSource.pause()/resume()/set_speed() (task 4.7) were left waiting for, per task 4.9's own
 frontend `ReplayControlBar.tsx` code-comment note (its Play/Pause and speed controls render real
 backend state but stay `disabled` until this exists).
+
+BUILD_PLAN.md tasks 3.7/3.10 add POST /api/ddma/decide and POST /api/village/acknowledge — see
+each route's own docstring below for the scope ruling (option (a) from each task's own choice:
+real backend wiring over `audit/producers.py`'s already-real, already-tested producer functions,
+rather than an honestly-disabled frontend stub).
 """
 from __future__ import annotations
+
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from app.audit.producers import record_ddma_decision, record_village_acknowledged
 from app.config import AOIS
+from app.core.clock import LiveClock
 from app.core.mode import ModeError
 from app.ingest.factory import SCENARIOS_DIR, UnknownScenarioError, load_scenario_or_raise
 from app.schemas.audit import AuditEvent
+from app.schemas.decision import ActionCard
 from app.schemas.mode import ModeState
 
 router = APIRouter(prefix="/api")
@@ -147,3 +157,71 @@ async def get_audit_trail(alert_id: str, request: Request) -> list[AuditEvent]:
     """
     app_state = _app_state(request)
     return app_state.pipeline.audit_log.for_alert(alert_id)
+
+
+class DdmaDecisionRequest(BaseModel):
+    action_card: ActionCard
+    officer_id: str
+    decision: Literal["approved", "modified", "rejected"] = "approved"
+    notes: str = ""
+
+
+@router.post("/ddma/decide")
+async def ddma_decide(body: DdmaDecisionRequest, request: Request) -> AuditEvent:
+    """BUILD_PLAN.md task 3.7's DDMA Console: the human-in-the-loop Approve/Modify/Reject action.
+
+    **Scope ruling (task 3.7 offered two honest choices; this is choice (a)):**
+    `audit/producers.py::record_ddma_decision` (task 3.6(a)) already did the real work of
+    building a correctly-typed, correctly-chained `DDMA_APPROVED`/`STOOD_DOWN` `AuditEvent` — it
+    was callable but not yet called from anywhere. This route is the small, well-scoped REST
+    wiring task 3.7 anticipated ("check `api/routes.py`'s existing patterns for how routes reach
+    `AppState`/`audit_log`"), not a reimplementation.
+
+    The full `ActionCard` being decided is accepted IN THE REQUEST BODY rather than looked up
+    server-side by `alert_id`: this codebase has no server-side `ActionCard` store keyed by
+    `alert_id` anywhere (`TickResult.new_action_cards` is a broadcast-only, fire-and-forget
+    WebSocket payload — `pipeline.py` does not retain past ticks' cards). The frontend already
+    holds the real `ActionCard` it received over `/ws/ticks` (`useTickStore.actionCards`), so
+    round-tripping it here is the honest option — the alternative (inventing a server-side lookup
+    against data that isn't persisted) would be worse, not simpler.
+
+    `t=LiveClock().now()` (not `clock.now()` off whichever `Clock` is driving the current tick
+    loop): a DDMA officer's approval is a genuine real-world action happening at real wall-clock
+    time, in BOTH LIVE and REPLAY mode — a human clicking "Approve" while watching an accelerated
+    replay did not act at 60x speed. `LiveClock` is CLAUDE.md rule 14's one designated escape
+    hatch (`core/clock.py`), the same pattern `ingest/live/imerg.py`'s CLI entry point already
+    uses for an out-of-pipeline, real-time action.
+    """
+    app_state = _app_state(request)
+    return record_ddma_decision(
+        app_state.pipeline.audit_log,
+        action_card=body.action_card,
+        officer_id=body.officer_id,
+        t=LiveClock().now(),
+        decision=body.decision,
+        notes=body.notes,
+    )
+
+
+class VillageAcknowledgeRequest(BaseModel):
+    alert_id: str
+    village_id: str
+
+
+@router.post("/village/acknowledge")
+async def village_acknowledge(body: VillageAcknowledgeRequest, request: Request) -> AuditEvent:
+    """BUILD_PLAN.md task 3.10's Village View "I have evacuated" button.
+
+    **Scope ruling (task 3.10 offered the same two honest choices as 3.7; this is choice (a)):**
+    `audit/producers.py::record_village_acknowledged` (added this session) does the real work;
+    this route is the REST wiring, following the exact same shape as `ddma_decide` above.
+    `t=LiveClock().now()` for the same reason: a citizen tapping "I have evacuated" is a genuine
+    real-world action at real wall-clock time, not scenario time.
+    """
+    app_state = _app_state(request)
+    return record_village_acknowledged(
+        app_state.pipeline.audit_log,
+        alert_id=body.alert_id,
+        village_id=body.village_id,
+        t=LiveClock().now(),
+    )

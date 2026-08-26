@@ -17,15 +17,16 @@ explicitly out of this session's scope; see BUILD_PLAN.md task 3.6's own framing
 new producers into an existing sink, not building the sink itself" — the same phrase
 `decision/escalation.py`'s own docstring already quotes for its ESCALATED producer).
 
-SCOPE NOTE: `DELIVERED` and `VILLAGE_ACKNOWLEDGED` are deliberately NOT given producers here. Both
-are events BUILD_PLAN.md attaches to later, separate, human/field actions this session doesn't
-build — `DELIVERED` in a fully real deployment is an asynchronous delivery-confirmation callback
-from a telecom/push provider (this project's channels are simulated, task 3.5, precisely so no
-such callback exists to wire), and `VILLAGE_ACKNOWLEDGED` is the citizen-facing "I have evacuated"
-button (BUILD_PLAN.md task 3.10, Village View, not built yet). Adding producers for events with no
-real trigger anywhere in this codebase would be exactly the kind of fabrication CLAUDE.md's
-honesty rules ban — narrower scope than the task's own two named events, documented rather than
-silently expanded past them.
+SCOPE NOTE (updated, task 3.10 session): `DELIVERED` is still deliberately NOT given a producer
+here — in a fully real deployment it is an asynchronous delivery-confirmation callback from a
+telecom/push provider, and this project's channels are simulated (task 3.5) precisely so no such
+callback exists to wire. Adding a producer for an event with no real trigger anywhere in this
+codebase would be exactly the kind of fabrication CLAUDE.md's honesty rules ban.
+
+`VILLAGE_ACKNOWLEDGED` **now has a real producer** (`record_village_acknowledged`, below) — its
+real trigger, the citizen-facing "I have evacuated" button (BUILD_PLAN.md task 3.10, Village
+View), now exists (`frontend/src/components/VillageView.tsx`) and calls
+`POST /api/village/acknowledge` (`api/routes.py`), which calls this function.
 """
 from __future__ import annotations
 
@@ -123,4 +124,39 @@ def record_dissemination(
             "total_delivered": sum(r.delivered_count for r in channel_results),
             "total_acknowledged": sum(r.acknowledged_count for r in channel_results),
         },
+    )
+
+
+def record_village_acknowledged(
+    audit_log: AuditLog,
+    *,
+    alert_id: str,
+    village_id: str,
+    t: datetime,
+) -> AuditEvent:
+    """BUILD_PLAN.md task 3.10's "I have evacuated" button, made real: the citizen-facing
+    acknowledgement that closes the AI Flagged -> DDMA Approved -> Disseminated -> Village
+    Acknowledged chain CLAUDE.md's audit-trail glossary entry describes.
+
+    `actor` is `"village:{village_id}"` — matching `AuditEvent.actor`'s own documented convention
+    (`"system" | "ddma:officer_id" | "village:id"`). This is the second (and last) place in this
+    whole stack where `actor` is ever a real, non-system party — the first being
+    `record_ddma_decision` above, a DDMA officer; this one is the village itself, acting through
+    whichever device rendered its Village View.
+
+    No `ActionCard`/officer/channel object is required here — unlike `DDMA_APPROVED`/
+    `DISSEMINATED`, a village acknowledgement is a bare fact ("this alert_id, this village,
+    acknowledged, at this time"), not a decision about a payload. `alert_id` is caller-supplied
+    (the `ActionCard.alert_id` the citizen's device already holds, received over `/ws/ticks`)
+    rather than looked up server-side — same reasoning `record_ddma_decision`/`record_dissemination`
+    already establish: this codebase has no server-side `ActionCard` store keyed by `alert_id`,
+    so the caller (frontend) is the natural source of truth for which alert is being acknowledged.
+    """
+    return audit_log.append(
+        event_id=f"evt-ack-{alert_id}-{t.isoformat()}",
+        alert_id=alert_id,
+        kind="VILLAGE_ACKNOWLEDGED",
+        actor=f"village:{village_id}",
+        t=t,
+        payload={"village_id": village_id},
     )

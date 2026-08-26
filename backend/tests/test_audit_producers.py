@@ -5,7 +5,11 @@ from datetime import datetime, timedelta, timezone
 
 from app.audit.hash_chain import GENESIS_HASH, chain_hash
 from app.audit.log import AuditLog
-from app.audit.producers import record_ddma_decision, record_dissemination
+from app.audit.producers import (
+    record_ddma_decision,
+    record_dissemination,
+    record_village_acknowledged,
+)
 from app.dissemination.channels import CellBroadcastChannel, SmsChannel
 from app.schemas.decision import ActionCard
 
@@ -131,6 +135,39 @@ class TestRecordDissemination:
         assert event_a.hash == event_b.hash
 
 
+class TestRecordVillageAcknowledged:
+    def test_appends_village_acknowledged_event(self):
+        log = AuditLog()
+        event = record_village_acknowledged(log, alert_id="alert-v1-1", village_id="v1", t=T)
+        assert event.kind == "VILLAGE_ACKNOWLEDGED"
+        assert event.alert_id == "alert-v1-1"
+        assert log.for_alert("alert-v1-1") == [event]
+
+    def test_actor_is_village_not_system_or_ddma(self):
+        log = AuditLog()
+        event = record_village_acknowledged(log, alert_id="alert-v1-1", village_id="v1", t=T)
+        assert event.actor == "village:v1"
+
+    def test_payload_records_village_id(self):
+        log = AuditLog()
+        event = record_village_acknowledged(log, alert_id="alert-v1-1", village_id="v1", t=T)
+        assert event.payload["village_id"] == "v1"
+
+    def test_hash_chains_from_genesis_for_first_event(self):
+        log = AuditLog()
+        event = record_village_acknowledged(log, alert_id="alert-v1-1", village_id="v1", t=T)
+        assert event.prev_hash == GENESIS_HASH
+        expected = chain_hash(GENESIS_HASH, event.input_hash, event_id=event.event_id, kind=event.kind)
+        assert event.hash == expected
+
+    def test_deterministic_given_same_inputs(self):
+        log_a, log_b = AuditLog(), AuditLog()
+        event_a = record_village_acknowledged(log_a, alert_id="alert-v1-1", village_id="v1", t=T)
+        event_b = record_village_acknowledged(log_b, alert_id="alert-v1-1", village_id="v1", t=T)
+        assert event_a.hash == event_b.hash
+        assert event_a.event_id == event_b.event_id
+
+
 class TestFullChainAcrossProducers:
     """Proves ESCALATED (decision/escalation.py) + DDMA_APPROVED + DISSEMINATED all chain
     correctly into ONE shared AuditLog, exactly the "full event chain" GET /api/audit/{alert_id}
@@ -167,3 +204,30 @@ class TestFullChainAcrossProducers:
         assert [e.kind for e in alert_chain] == ["ESCALATED", "DDMA_APPROVED", "DISSEMINATED"]
         assert approval_event in alert_chain
         assert dissem_event in alert_chain
+
+    def test_full_chain_including_village_acknowledged_is_the_complete_glossary_sequence(self):
+        """CLAUDE.md's audit-trail glossary entry: AI Flagged -> DDMA Approved -> Disseminated ->
+        Village Acknowledged. AI_FLAGGED itself is produced by pipeline.py (not exercised here,
+        same as the test above) — this proves the three producer-function-driven events plus the
+        task-3.10 VILLAGE_ACKNOWLEDGED event chain together correctly."""
+        log = AuditLog()
+        card = make_card(alert_id="alert-v1-full")
+
+        approval_event = record_ddma_decision(log, action_card=card, officer_id="officer_1", t=T)
+        results = [CellBroadcastChannel().send(card, recipient_count=10)]
+        dissem_event = record_dissemination(
+            log, action_card=card, channel_results=results, t=T + timedelta(minutes=1)
+        )
+        ack_event = record_village_acknowledged(
+            log, alert_id=card.alert_id, village_id=card.village_id, t=T + timedelta(minutes=10)
+        )
+
+        alert_chain = log.for_alert("alert-v1-full")
+        assert [e.kind for e in alert_chain] == ["DDMA_APPROVED", "DISSEMINATED", "VILLAGE_ACKNOWLEDGED"]
+        prev = GENESIS_HASH
+        for event in alert_chain:
+            assert event.prev_hash == prev
+            prev = event.hash
+        assert approval_event in alert_chain
+        assert dissem_event in alert_chain
+        assert ack_event in alert_chain

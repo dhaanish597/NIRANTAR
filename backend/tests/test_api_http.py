@@ -175,6 +175,118 @@ def test_get_audit_trail_returns_the_real_chain_for_a_live_ai_flagged_alert():
     assert "hash" in events[0] and "prev_hash" in events[0]
 
 
+def _sample_action_card(alert_id: str = "alert-v1-test") -> dict:
+    # Matches app.schemas.decision.ActionCard's required fields exactly (see
+    # backend/tests/test_audit_producers.py::make_card for the Python-side equivalent).
+    return {
+        "alert_id": alert_id,
+        "village_id": "v1",
+        "stage": "RED",
+        "headline": "Evacuate Now",
+        "reason_plain": "test reason",
+        "shelter_name": "Test Shelter",
+        "route": None,
+        "roads_to_avoid": ["NH6"],
+        "what_to_carry": ["ID"],
+        "contact": "placeholder",
+        "issued_at": "2026-05-28T03:20:00+00:00",
+        "valid_until": "2026-05-28T09:20:00+00:00",
+        "safe_window_hours": [0.0, 1.0],
+        "translations": {},
+        "audio_urls": {},
+    }
+
+
+def test_ddma_decide_approved_appends_ddma_approved_and_is_visible_over_the_audit_endpoint():
+    with make_client() as client:
+        response = client.post(
+            "/api/ddma/decide",
+            json={
+                "action_card": _sample_action_card(),
+                "officer_id": "officer_placeholder",
+                "decision": "approved",
+            },
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["kind"] == "DDMA_APPROVED"
+    assert body["actor"] == "ddma:officer_placeholder"
+    assert body["alert_id"] == "alert-v1-test"
+    assert "hash" in body and "prev_hash" in body
+
+
+def test_ddma_decide_rejected_appends_stood_down_not_ddma_approved():
+    with make_client() as client:
+        response = client.post(
+            "/api/ddma/decide",
+            json={
+                "action_card": _sample_action_card("alert-v1-reject"),
+                "officer_id": "officer_placeholder",
+                "decision": "rejected",
+            },
+        )
+    assert response.status_code == 200
+    assert response.json()["kind"] == "STOOD_DOWN"
+
+
+def test_ddma_decide_missing_required_field_is_422():
+    with make_client() as client:
+        response = client.post("/api/ddma/decide", json={"action_card": _sample_action_card()})
+    assert response.status_code == 422
+
+
+def test_ddma_decide_then_get_audit_trail_returns_the_decision():
+    with make_client() as client:
+        card = _sample_action_card("alert-v1-roundtrip")
+        client.post(
+            "/api/ddma/decide",
+            json={"action_card": card, "officer_id": "officer_placeholder", "decision": "approved"},
+        )
+        response = client.get(f"/api/audit/{card['alert_id']}")
+    assert response.status_code == 200
+    events = response.json()
+    assert [e["kind"] for e in events] == ["DDMA_APPROVED"]
+
+
+def test_village_acknowledge_appends_village_acknowledged_event():
+    with make_client() as client:
+        response = client.post(
+            "/api/village/acknowledge",
+            json={"alert_id": "alert-v1-ack", "village_id": "v1"},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["kind"] == "VILLAGE_ACKNOWLEDGED"
+    assert body["actor"] == "village:v1"
+    assert body["alert_id"] == "alert-v1-ack"
+
+
+def test_village_acknowledge_missing_field_is_422():
+    with make_client() as client:
+        response = client.post("/api/village/acknowledge", json={"alert_id": "alert-v1-ack"})
+    assert response.status_code == 422
+
+
+def test_village_acknowledge_then_get_audit_trail_shows_it_after_a_ddma_decision():
+    """Proves DDMA_APPROVED and VILLAGE_ACKNOWLEDGED share one real, ordered, hash-chained
+    history over HTTP for the same alert_id — the sequence the Audit Trail view (task 3.8)
+    renders."""
+    with make_client() as client:
+        card = _sample_action_card("alert-v1-full-chain")
+        client.post(
+            "/api/ddma/decide",
+            json={"action_card": card, "officer_id": "officer_placeholder", "decision": "approved"},
+        )
+        client.post(
+            "/api/village/acknowledge",
+            json={"alert_id": card["alert_id"], "village_id": card["village_id"]},
+        )
+        response = client.get(f"/api/audit/{card['alert_id']}")
+    events = response.json()
+    assert [e["kind"] for e in events] == ["DDMA_APPROVED", "VILLAGE_ACKNOWLEDGED"]
+    assert events[1]["prev_hash"] == events[0]["hash"]
+
+
 def test_ws_ticks_eventually_shows_the_full_escalation_arc():
     """Proves the browser-facing path (not just the pipeline-level test) sees the same rising
     p_fail arc that test_smoke_scenario.py proves at the pipeline level.
