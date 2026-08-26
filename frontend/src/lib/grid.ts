@@ -9,15 +9,18 @@ import { colorForPFail } from './escalation'
  * 3x3 square layout purely from the cell_id, centered on the AOI's stub center.
  *
  * Two id shapes are recognised, both mapping onto the SAME synthetic 3x3 layout:
- *   1. The Phase 0 stub convention ("aizawl_{row}{col}", row in {40,41,42}, col in {1,2,3}) —
- *      still used by `backend/app/ingest/live/stub_source.py` (LIVE mode) and by any scenario
- *      file not yet migrated (`wayanad-2024.json`, `tupul-2022.json` — a documented, separate
- *      gap, see BUILD_PLAN.md task 4.4/4.5's own AOI-config notes).
+ *   1. The Phase 0 stub convention ("<aoi>_{row}{col}", row in {40,41,42}, col in {1,2,3}) —
+ *      still used by `backend/app/ingest/live/stub_source.py` (LIVE mode, Aizawl only).
  *   2. A small, explicit, closed set of REAL `cells.gpkg` cell_ids (see
- *      `REMAPPED_REAL_CELL_POSITIONS` below) that a later session's cell-id migration remapped
- *      `data/scenarios/_smoke.json` and `aizawl-2024.json` onto — each real id occupies the exact
+ *      `REMAPPED_REAL_CELL_POSITIONS` below) that this session's cell-id migration remapped
+ *      `data/scenarios/_smoke.json`, `aizawl-2024.json`, `wayanad-2024.json`, and
+ *      `tupul-2022.json` onto (BUILD_PLAN.md tasks 4.3-4.5) — each real id occupies the exact
  *      slot its stub predecessor used, so this file's rendering logic didn't need to change, only
- *      which id maps to which slot.
+ *      which id maps to which slot. A real id's row/col in its own AOI's `cells.gpkg` has no
+ *      relationship to this 3x3 visual layout (it's a position in that AOI's actual ~4,000+ cell
+ *      terrain grid) — there is no regex to derive a slot from, hence an explicit table rather
+ *      than a second parsed convention. Ids from different AOIs can't collide (each is prefixed
+ *      with its own AOI id), so this is one flat table, not one keyed by AOI.
  *
  * This is fabricated positioning for visualization only in BOTH cases — it is not a claim about
  * where any real slope is, even for the real cell_ids in case 2 (their true polygon, from
@@ -36,31 +39,53 @@ export interface CellGridPosition {
   col: number
 }
 
-/** See module docstring, id shape 2. Deliberately NOT parsed algorithmically — a real cells.gpkg
- * id (`aizawl_{row:03d}_{col:03d}`) does not encode a demo-grid position, so this is a small,
- * explicitly-listed table, not a general parser. Values chosen to include several real named
- * Aizawl villages' actual nearest analysis cell (see the cell-id migration commit for how each
- * was resolved), so escalation for `_smoke`/`aizawl-2024` now reaches real villages, not just
- * fabricated ones. */
-const REMAPPED_REAL_CELL_POSITIONS: Record<string, { row: number; col: number }> = {
-  aizawl_012_001: { row: 0, col: 0 }, // was aizawl_401
-  aizawl_039_050: { row: 0, col: 1 }, // was aizawl_402
-  aizawl_044_048: { row: 0, col: 2 }, // was aizawl_403
-  aizawl_040_026: { row: 1, col: 0 }, // was aizawl_411 — Durtlang's real nearest cell
-  aizawl_022_001: { row: 1, col: 1 }, // was aizawl_412 — Reiek's real nearest cell
-  aizawl_003_024: { row: 1, col: 2 }, // was aizawl_413 — Muallungthu's real nearest cell
-  aizawl_026_040: { row: 2, col: 0 }, // was aizawl_421 — Tuirial's real nearest cell
-  aizawl_029_040: { row: 2, col: 1 }, // was aizawl_422 — Tuirial's real nearest cell (2nd village)
-  aizawl_054_046: { row: 2, col: 2 }, // was aizawl_423 — Tuirini's real nearest cell
+/** Deliberately NOT parsed algorithmically — see module docstring, id shape 2. One entry per real
+ * cell_id that appears in a committed scenario file, each mapped onto one of the same nine visual
+ * grid slots (row/col in 0..2) its stub predecessor used. */
+export const REMAPPED_REAL_CELL_POSITIONS: Record<string, CellGridPosition> = {
+  // _smoke.json / aizawl-2024.json (9 real cells, each a real named Aizawl village's actual
+  // nearest analysis cell — see the cell-id migration commit for how each was resolved).
+  aizawl_012_001: { cellId: 'aizawl_012_001', row: 0, col: 0 }, // was aizawl_401
+  aizawl_039_050: { cellId: 'aizawl_039_050', row: 0, col: 1 }, // was aizawl_402
+  aizawl_044_048: { cellId: 'aizawl_044_048', row: 0, col: 2 }, // was aizawl_403
+  aizawl_040_026: { cellId: 'aizawl_040_026', row: 1, col: 0 }, // was aizawl_411 — Durtlang
+  aizawl_022_001: { cellId: 'aizawl_022_001', row: 1, col: 1 }, // was aizawl_412 — Reiek
+  aizawl_003_024: { cellId: 'aizawl_003_024', row: 1, col: 2 }, // was aizawl_413 — Muallungthu
+  aizawl_026_040: { cellId: 'aizawl_026_040', row: 2, col: 0 }, // was aizawl_421 — Tuirial
+  aizawl_029_040: { cellId: 'aizawl_029_040', row: 2, col: 1 }, // was aizawl_422 — Tuirial (2nd)
+  aizawl_054_046: { cellId: 'aizawl_054_046', row: 2, col: 2 }, // was aizawl_423 — Tuirini
+  // wayanad-2024.json (9 real cells, nearest to 9 real Wayanad villages incl. Chooralmala,
+  // Mundakai, Puthumala, Meppadi, Vythiri — all confirmed present in the real OSM data this
+  // session's scripts/fetch_exposure.py --aoi wayanad run found).
+  wayanad_008_041: { cellId: 'wayanad_008_041', row: 0, col: 0 }, // nearest to Chooralmala
+  wayanad_006_040: { cellId: 'wayanad_006_040', row: 0, col: 1 }, // nearest to Mundakai
+  wayanad_009_037: { cellId: 'wayanad_009_037', row: 0, col: 2 }, // nearest to Puthumala
+  wayanad_020_035: { cellId: 'wayanad_020_035', row: 1, col: 0 }, // nearest to Meppadi
+  wayanad_021_015: { cellId: 'wayanad_021_015', row: 1, col: 1 }, // nearest to Vythiri
+  wayanad_065_008: { cellId: 'wayanad_065_008', row: 1, col: 2 }, // nearest to Naalam Mile
+  wayanad_064_008: { cellId: 'wayanad_064_008', row: 2, col: 0 }, // nearest to Kellur
+  wayanad_060_003: { cellId: 'wayanad_060_003', row: 2, col: 1 }, // nearest to Mazhuvannur
+  wayanad_064_010: { cellId: 'wayanad_064_010', row: 2, col: 2 }, // nearest to Ancham Mile
+  // tupul-2022.json (9 real cells, nearest to 9 real Tupul/Noney villages incl. the real village
+  // literally named "Tupul" — the disaster site itself).
+  tupul_036_012: { cellId: 'tupul_036_012', row: 0, col: 0 }, // nearest to the real village 'Tupul'
+  tupul_006_033: { cellId: 'tupul_006_033', row: 0, col: 1 }, // nearest to Joypur Khunou
+  tupul_041_032: { cellId: 'tupul_041_032', row: 0, col: 2 }, // nearest to S. Laijang
+  tupul_038_026: { cellId: 'tupul_038_026', row: 1, col: 0 }, // nearest to Boungjang
+  tupul_043_022: { cellId: 'tupul_043_022', row: 1, col: 1 }, // nearest to Kharam Pallen
+  tupul_038_013: { cellId: 'tupul_038_013', row: 1, col: 2 }, // nearest to Charoipandongba Kabui
+  tupul_007_021: { cellId: 'tupul_007_021', row: 2, col: 0 }, // nearest to Joupi
+  tupul_025_023: { cellId: 'tupul_025_023', row: 2, col: 1 }, // nearest to Loibol Khullen
+  tupul_001_010: { cellId: 'tupul_001_010', row: 2, col: 2 }, // nearest to L. Gamnonphai
 }
 
-/** Parses "aizawl_401" -> {row: 0, col: 0}, "aizawl_423" -> {row: 2, col: 2}, OR a remapped real
- * id (see `REMAPPED_REAL_CELL_POSITIONS`) -> its assigned slot. Returns null for any other
- * cell_id (e.g. a real cells.gpkg id NOT in the small remapped set — the general case Phase 1C/2
- * still needs a real geometry endpoint for). */
+/** Parses "aizawl_401" -> {row: 0, col: 0}, "aizawl_423" -> {row: 2, col: 2}, OR resolves a real
+ * remapped id (see `REMAPPED_REAL_CELL_POSITIONS`) -> its assigned slot. Returns null for any
+ * other cell_id (e.g. a real cells.gpkg id not in the small remapped set, or a stub id from an
+ * AOI with no `<aoi>_{row}{col}` LIVE-mode convention). */
 export function parseStubCellId(cellId: string): CellGridPosition | null {
   const remapped = REMAPPED_REAL_CELL_POSITIONS[cellId]
-  if (remapped) return { cellId, ...remapped }
+  if (remapped) return remapped
 
   const match = /^aizawl_(\d{2})(\d)$/.exec(cellId)
   if (!match) return null

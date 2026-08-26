@@ -25,6 +25,20 @@ describe('parseStubCellId', () => {
     expect(parseStubCellId('aizawl_999')).toBeNull() // row code 99 unknown
     expect(parseStubCellId('aizawl_404')).toBeNull() // col digit 4 out of [1,2,3]
   })
+
+  it('resolves the remapped real Wayanad/Tupul cell ids (tasks 4.4/4.5) via the lookup table', () => {
+    // wayanad-2024.json's real cell_ids, remapped this session onto real
+    // scripts/build_grid.py ids — same nine visual slots their stub predecessors held.
+    expect(parseStubCellId('wayanad_008_041')).toEqual({ cellId: 'wayanad_008_041', row: 0, col: 0 })
+    expect(parseStubCellId('wayanad_060_003')).toEqual({ cellId: 'wayanad_060_003', row: 2, col: 1 })
+    // tupul-2022.json's, including the real cell nearest the real village literally named 'Tupul'.
+    expect(parseStubCellId('tupul_036_012')).toEqual({ cellId: 'tupul_036_012', row: 0, col: 0 })
+    expect(parseStubCellId('tupul_001_010')).toEqual({ cellId: 'tupul_001_010', row: 2, col: 2 })
+  })
+
+  it('still returns null for a real id that has not been remapped/registered', () => {
+    expect(parseStubCellId('aizawl_007_014')).toBeNull()
+  })
 })
 
 describe('cellRisksToFeatureCollection', () => {
