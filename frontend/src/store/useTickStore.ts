@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api } from '../lib/api'
+import { cacheActionCards, getCachedActionCards } from '../lib/offlineData'
 import { connectTickSocket, type WsStatus } from '../lib/ws'
 import type {
   ActionCard,
@@ -61,6 +62,13 @@ interface TickStoreState {
   loadInitial: (aoiId: string) => Promise<void>
   startReplay: (scenarioId: string) => Promise<void>
   stopReplay: () => Promise<void>
+  /** BUILD_PLAN.md task 5.3: loads the last IndexedDB-cached action cards (frontend/src/lib/
+   * offlineData.ts) into the store, called once at app boot (App.tsx) BEFORE any real WebSocket
+   * tick can arrive — so a citizen opening the app fully offline still sees the last known action
+   * card/route/shelter/contact instead of an empty screen. Never overwrites real tick data: a
+   * no-op once any tick has actually populated `actionCards` (checked at call time, not by
+   * ordering alone, so a slow cache read racing a fast first tick can't clobber it). */
+  hydrateFromOfflineCache: () => Promise<void>
   /** Exposed (not just used internally by connect()) so it's directly unit-testable without a
    * real WebSocket — see src/store/useTickStore.test.ts. */
   applyTick: (tick: TickResult) => void
@@ -138,14 +146,31 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
     }
   },
 
-  applyTick: (tick: TickResult) =>
+  hydrateFromOfflineCache: async () => {
+    const cached = await getCachedActionCards()
+    if (cached.length === 0) return
+    // Guard at write time, not just at call time: a real tick could have arrived (and already
+    // set real actionCards) while this async cache read was in flight.
+    if (get().actionCards.length > 0) return
+    set({ actionCards: cached })
+  },
+
+  applyTick: (tick: TickResult) => {
+    const nextActionCards = [...tick.new_action_cards, ...get().actionCards].slice(
+      0,
+      MAX_ACTION_CARDS,
+    )
+    // BUILD_PLAN.md task 5.3: cache the up-to-date action card list to IndexedDB on every tick —
+    // fire-and-forget (offlineData.ts's own `cacheActionCards` fails open on any storage error),
+    // never blocks tick handling.
+    void cacheActionCards(nextActionCards)
     set((state) => ({
       latestTick: tick,
       cellRisks: tick.cell_risks,
       roadRisks: tick.road_risks,
       isolations: tick.isolations,
       priorities: tick.priorities,
-      actionCards: [...tick.new_action_cards, ...state.actionCards].slice(0, MAX_ACTION_CARDS),
+      actionCards: nextActionCards,
       auditEvents: [...tick.new_audit_events, ...state.auditEvents].slice(0, MAX_AUDIT_EVENTS),
       // Only replay ticks feed the counterfactual scorecard (task 4.10) — a LIVE tick received
       // while a previous replay's history is still being reviewed must not contaminate it.
@@ -153,7 +178,8 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
         tick.mode === 'replay'
           ? [...state.replayTicks, tick].slice(-MAX_REPLAY_TICKS)
           : state.replayTicks,
-    })),
+    }))
+  },
 
   selectVillage: (villageId: string | null) => set({ selectedVillageId: villageId }),
   openScorecard: () => set({ scorecardOpen: true }),

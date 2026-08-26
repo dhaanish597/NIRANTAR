@@ -1,6 +1,8 @@
+import 'fake-indexeddb/auto'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../lib/api'
+import { _resetOfflineDataForTests, cacheActionCards } from '../lib/offlineData'
 import { useTickStore } from '../store/useTickStore'
 import type { ActionCard, AuditEvent, VillageIsolation } from '../types/schemas'
 
@@ -97,12 +99,20 @@ function makeAckEvent(): AuditEvent {
 
 beforeEach(() => {
   useTickStore.setState({ actionCards: [], isolations: [], auditTrailAlertId: null })
+  _resetOfflineDataForTests()
 })
 
 describe('VillageView', () => {
   it('shows an honest empty state when no village currently has an active alert', () => {
     render(<VillageView onBack={() => {}} />)
     expect(screen.getByText(/No active alert for any village right now/)).toBeInTheDocument()
+  })
+
+  it('BUILD_PLAN.md task 5.3: the empty state falls back to the real IndexedDB-cached shelter/contact from the last known action card', async () => {
+    await cacheActionCards([makeCard({ shelter_name: 'Cached Community Hall' })])
+    render(<VillageView onBack={() => {}} />)
+    await waitFor(() => expect(screen.getByText('Cached Community Hall')).toBeInTheDocument())
+    expect(screen.getByText('DDMA control room (placeholder)')).toBeInTheDocument()
   })
 
   it('renders the big stage, headline, and reason for the village\'s action card', () => {
@@ -159,15 +169,30 @@ describe('VillageView', () => {
     spy.mockRestore()
   })
 
-  it('shows an error message if acknowledging fails, without crashing', async () => {
+  it('BUILD_PLAN.md task 5.3: queues the acknowledgement (not an error) when the request fails, without crashing', async () => {
     const spy = vi.spyOn(api, 'acknowledgeVillage').mockRejectedValue(new Error('network error'))
     useTickStore.setState({ actionCards: [makeCard()], isolations })
     render(<VillageView onBack={() => {}} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'I have evacuated' }))
 
-    await waitFor(() => expect(screen.getByText(/Could not submit/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/Saved — offline/)).toBeInTheDocument())
+    expect(spy).toHaveBeenCalledWith({ alert_id: 'alert-v1-1', village_id: 'v1' })
     spy.mockRestore()
+  })
+
+  it('BUILD_PLAN.md task 5.3: queues immediately without even attempting the request when navigator.onLine is false', async () => {
+    const spy = vi.spyOn(api, 'acknowledgeVillage')
+    const onLineSpy = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    useTickStore.setState({ actionCards: [makeCard()], isolations })
+    render(<VillageView onBack={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'I have evacuated' }))
+
+    await waitFor(() => expect(screen.getByText(/Saved — offline/)).toBeInTheDocument())
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+    onLineSpy.mockRestore()
   })
 
   it('calls onBack when Back is clicked', () => {

@@ -11,6 +11,7 @@ import { RightRail } from './components/RightRail'
 import { ScenarioPickerModal } from './components/ScenarioPickerModal'
 import { VillageDetailDrawer } from './components/VillageDetailDrawer'
 import { VillageView } from './components/VillageView'
+import { attachAckQueueAutoSync, syncQueuedAcknowledgements } from './lib/ackQueue'
 import { useTickStore } from './store/useTickStore'
 
 // Phase 0 scope: a single hardcoded AOI. Real AOI selection is out of scope until more than one
@@ -28,14 +29,28 @@ function App() {
   const loadInitial = useTickStore((s) => s.loadInitial)
   const connect = useTickStore((s) => s.connect)
   const disconnect = useTickStore((s) => s.disconnect)
+  const hydrateFromOfflineCache = useTickStore((s) => s.hydrateFromOfflineCache)
   const wsStatus = useTickStore((s) => s.wsStatus)
   const error = useTickStore((s) => s.error)
 
   useEffect(() => {
+    // BUILD_PLAN.md task 5.3: read the IndexedDB-cached action cards BEFORE the network calls
+    // below — a citizen opening the app with no connectivity at all still sees the last known
+    // action card while `loadInitial`/`connect` fail quietly in the background, rather than an
+    // empty screen until (never) a first WebSocket tick arrives.
+    void hydrateFromOfflineCache()
     void loadInitial(AOI_ID)
     connect()
+    // Queued "I have evacuated" acknowledgements (VillageView.tsx) made while offline are synced
+    // for real the moment the browser's own `online` event fires — attached once, app-wide, not
+    // per-VillageView-mount, so a queued ack still syncs even if the citizen has navigated away
+    // from Village View by the time connectivity returns. Also attempt a sync right now, in case
+    // connectivity was already restored before this mount (the `online` event only fires on a
+    // transition, not on an already-online page load).
+    attachAckQueueAutoSync()
+    void syncQueuedAcknowledgements()
     return () => disconnect()
-  }, [loadInitial, connect, disconnect])
+  }, [loadInitial, connect, disconnect, hydrateFromOfflineCache])
 
   return (
     <div className="flex h-screen flex-col">
