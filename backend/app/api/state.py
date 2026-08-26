@@ -25,6 +25,7 @@ from app.core.mode import ModeMachine
 from app.ingest.base import DataSource
 from app.ingest.factory import build_clock_and_source, load_scenario_or_raise
 from app.pipeline import Pipeline
+from app.schemas.announcement import Announcement
 from app.schemas.mode import RunMode
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,10 @@ class AppState:
         self.bus = Bus()
         self.mode = ModeMachine(self.bus)
         self.pipeline = Pipeline()
+        # Real Announcements this session has dispatched (Task 3/4, Foundation sub-project).
+        # Independent of replay state — an announcement made in LIVE mode stays visible even if a
+        # replay starts afterwards, unlike self.pipeline (which IS reassigned on start_replay()).
+        self.announcements: list[Announcement] = []
         self._realtime = realtime
         self._task: asyncio.Task | None = None
         # The currently in-flight DataSource — kept so pause()/resume()/set_speed() (BUILD_PLAN.md

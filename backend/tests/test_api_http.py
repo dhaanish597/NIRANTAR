@@ -313,3 +313,95 @@ def test_ws_ticks_eventually_shows_the_full_escalation_arc():
 
     assert "RED" in stages_seen
     assert "ORANGE" in stages_seen
+
+
+import json
+
+
+def _sample_announcement_card(alert_id: str = "alert-1") -> dict:
+    # Named distinctly from the pre-existing `_sample_action_card` above (default alert_id
+    # "alert-v1-test") — reusing that name here would shadow it at module scope (Python resolves
+    # a bare name from the module's global namespace at CALL time, not at each test's definition
+    # site), silently changing the default alert_id every earlier test in this file that calls
+    # `_sample_action_card()` with no argument. Caught for real: this collision broke
+    # test_ddma_decide_approved_appends_ddma_approved_and_is_visible_over_the_audit_endpoint's
+    # `alert_id == "alert-v1-test"` assertion before this rename.
+    return {
+        "alert_id": alert_id,
+        "village_id": "v1",
+        "stage": "RED",
+        "headline": "Evacuate now",
+        "reason_plain": "Heavy rainfall and slope movement",
+        "shelter_name": "Community Hall",
+        "route": None,
+        "roads_to_avoid": [],
+        "what_to_carry": [],
+        "contact": "108",
+        "issued_at": "2026-01-01T00:00:00+05:30",
+        "valid_until": "2026-01-02T00:00:00+05:30",
+        "safe_window_hours": None,
+        "translations": {},
+        "audio_urls": {},
+    }
+
+
+def test_post_announcement_dispatches_and_records_audit():
+    with make_client() as client:
+        card = _sample_announcement_card()
+        response = client.post(
+            "/api/announcements",
+            json={"action_card": card, "officer_id": "officer-1", "recipient_count": 500},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert {r["channel"] for r in body["channel_results"]} == {
+            "cell_broadcast",
+            "sms",
+            "push",
+            "mesh",
+        }
+
+        audit_response = client.get(f"/api/audit/{card['alert_id']}")
+        kinds = [e["kind"] for e in audit_response.json()]
+        assert "DDMA_APPROVED" in kinds
+        assert "DISSEMINATED" in kinds
+
+
+def test_get_announcements_lists_newest_first():
+    with make_client() as client:
+        client.post(
+            "/api/announcements",
+            json={
+                "action_card": _sample_announcement_card("a1"),
+                "officer_id": "o",
+                "recipient_count": 1,
+            },
+        )
+        client.post(
+            "/api/announcements",
+            json={
+                "action_card": _sample_announcement_card("a2"),
+                "officer_id": "o",
+                "recipient_count": 1,
+            },
+        )
+        response = client.get("/api/announcements")
+        ids = [a["alert_id"] for a in response.json()]
+    assert ids == ["a2", "a1"]
+
+
+def test_announcement_is_broadcast_over_ws_ticks():
+    with make_client() as client:
+        card = _sample_announcement_card()
+        with client.websocket_connect("/ws/ticks") as ws:
+            client.post(
+                "/api/announcements",
+                json={"action_card": card, "officer_id": "o", "recipient_count": 1},
+            )
+            for _ in range(20):
+                message = json.loads(ws.receive_text())
+                if message.get("type") == "announcement":
+                    assert message["data"]["alert_id"] == card["alert_id"]
+                    break
+            else:
+                pytest.fail("no announcement message received over /ws/ticks")

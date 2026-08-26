@@ -24,16 +24,19 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from app.api.announcements import AnnouncementRequest, create_announcement, list_announcements
 from app.api.whatif import WhatIfRequest, WhatIfResult, build_synthetic_frame
 from app.audit.producers import record_ddma_decision, record_village_acknowledged
 from app.config import AOIS
 from app.config import get_aoi as get_aoi_config  # aliased: this module's OWN `/api/aoi/{id}`
 # route below is itself named `get_aoi` — importing app.config's function under its real name
 # would silently shadow that route function at module scope.
+from app.core.bus import Topic
 from app.core.clock import LiveClock
 from app.core.mode import ModeError
 from app.ingest.factory import SCENARIOS_DIR, UnknownScenarioError, load_scenario_or_raise
 from app.pipeline import Pipeline
+from app.schemas.announcement import Announcement
 from app.schemas.audit import AuditEvent
 from app.schemas.decision import ActionCard
 from app.schemas.mode import ModeState, RunMode
@@ -166,6 +169,24 @@ async def get_audit_trail(alert_id: str, request: Request) -> list[AuditEvent]:
     """
     app_state = _app_state(request)
     return app_state.pipeline.audit_log.for_alert(alert_id)
+
+
+@router.post("/announcements")
+async def post_announcement(body: AnnouncementRequest, request: Request) -> Announcement:
+    """Closes the gap CLAUDE.md's own Known Gaps section names: real approve -> real simulated
+    channel send -> real DISSEMINATED audit event -> broadcast to any connected client."""
+    app_state = _app_state(request)
+    announcement = create_announcement(
+        body, audit_log=app_state.pipeline.audit_log, announcements=app_state.announcements
+    )
+    await app_state.bus.publish(Topic.DISSEMINATION, announcement)
+    return announcement
+
+
+@router.get("/announcements")
+async def get_announcements(request: Request) -> list[Announcement]:
+    app_state = _app_state(request)
+    return list_announcements(app_state.announcements)
 
 
 class DdmaDecisionRequest(BaseModel):
