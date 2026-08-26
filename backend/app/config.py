@@ -176,3 +176,76 @@ ROAD_CLEARANCE_HOURS_DEFAULT = 12.0  # highway class not in the table above
 # not a cleanup — motivated by the same Punapuzha bridge (Mundakkai, Wayanad) case P_CRIT_BRIDGE
 # cites above. Multiplies the base class hours; not itself a measured rebuild-time figure.
 BRIDGE_CLEARANCE_MULTIPLIER = 2.0
+
+# =================================================================================================
+# Phase 3 — decision layer (BUILD_PLAN.md tasks 2.6, 3.1, 3.3): safe evacuation window, routing,
+# action cards. All ENGINEERING DEFAULTS (CLAUDE.md rule 1), not measured/fit values, same status
+# as the Phase 2 constants above.
+# =================================================================================================
+
+# decision/window.py (task 2.6): the exceedance-ratio value (risk/thresholds.py's
+# threshold_exceedance_ratio — 1.0 means observed rainfall meets the published I-D/E-D threshold
+# for that duration) at/above which the safe evacuation window collapses to "now" rather than a
+# projected future crossing. 1.0 is the threshold engine's own natural "met" boundary, not a
+# separately-fit number.
+WINDOW_CRITICAL_EXCEEDANCE_RATIO = 1.0
+# Fewer than this many trend observations and a linear fit is not attempted at all (CLAUDE.md
+# rule 1: don't state a projection we can't back with data) — returns no window rather than a
+# noisy one-line-through-two-points guess.
+WINDOW_MIN_TREND_POINTS = 3
+# A projected crossing further out than this is not reported — matches rain_72h, the longest
+# accumulation window CellObservation actually carries (schemas/ingest.py); projecting past the
+# horizon of our own longest observed signal would overstate this module's real predictive reach.
+WINDOW_MAX_FORECAST_HOURS = 72.0
+# Half-width of the returned range, as a fraction of the projected hours-until-crossing — an
+# engineering default expressing "this is a rough projection, not a precise ETA" (CLAUDE.md's
+# "safe evacuation window ... never time to landslide" framing). TODO(verify): replace with a
+# statistically-derived prediction interval once enough real replayed events exist to calibrate one.
+WINDOW_MARGIN_FRACTION = 0.25
+# Floor on the range half-width in hours, so a crossing projected only an hour or two out doesn't
+# collapse to a falsely-precise point estimate.
+WINDOW_MIN_MARGIN_HOURS = 0.5
+# When already at/above WINDOW_CRITICAL_EXCEEDANCE_RATIO, the window is reported as (0, this) —
+# "act now", not a projection at all.
+WINDOW_IMMEDIATE_UPPER_HOURS = 1.0
+
+# decision/routing.py (task 3.1): C_edge = L_edge * (1 + alpha*P_fail_edge + beta*S_slope_edge)
+# (CLAUDE.md §4). P_fail_edge here is impact/road_graph.py's RoadSegmentRisk.p_blocked for that
+# edge — see decision/routing.py's module docstring for why that substitution is the right one.
+# alpha=3.0 means a fully-at-risk-but-not-yet-severed edge (p_blocked approx 1.0, just under
+# P_CRIT_ROAD) costs roughly 4x its plain length — strongly discourages routing through it without
+# banning it outright (edges past P_crit are removed entirely, a separate, harder rule). Engineering
+# default, not a cited figure; tunable (CLAUDE.md §4: "must be tunable from the UI").
+ROUTING_ALPHA_P_FAIL = 3.0
+# beta*S_slope_edge: structurally present, currently a no-op for every edge in practice — no
+# per-edge road-surface-slope dataset exists yet (see decision/routing.py's module docstring).
+# Kept non-zero so the term is visibly "real" the moment slope data is wired in, not disabled.
+ROUTING_BETA_SLOPE = 1.0
+# Average walking pace used ONLY to convert a computed route's physical distance into
+# EvacuationRoute.est_walk_minutes — hilly terrain, on foot, an engineering default (not a cited
+# figure); ALWAYS presented as an estimate, matching VillageIsolation.est_duration_hours's own
+# honesty framing.
+ROUTING_WALKING_SPEED_KMH = 4.0
+
+# decision/action_card.py (task 3.3).
+# How long an issued ActionCard is treated as current before it should be considered stale/
+# re-issued. Matches decision/stub.py's Phase 0 placeholder value (kept for continuity, not
+# re-derived — see EscalationConfig's own docstring note for the same pattern).
+ACTION_CARD_VALID_FOR_HOURS = 6.0
+# General emergency-evacuation checklist — NOT scenario- or hazard-specific, and not sourced from
+# docs/reference/ (CLAUDE.md: don't invent facts — this is a generic, defensible checklist, not a
+# claimed authoritative one). Documented explicitly as such wherever it's rendered.
+WHAT_TO_CARRY_CHECKLIST: list[str] = [
+    "Identity documents",
+    "Essential medicines",
+    "Torch/flashlight with spare batteries",
+    "Drinking water",
+    "Mobile phone with charger or power bank",
+    "Warm/weatherproof clothing",
+]
+# CLAUDE.md rule: don't invent a real DDMA phone number — none is cited anywhere in
+# docs/reference/. This is an explicit, self-labelling placeholder string, not a real contact.
+ACTION_CARD_CONTACT_PLACEHOLDER = (
+    "District Disaster Management Authority (DDMA) control room — "
+    "contact number not yet configured for this AOI (placeholder, not a real number)"
+)
