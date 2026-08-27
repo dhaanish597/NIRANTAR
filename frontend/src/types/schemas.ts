@@ -219,6 +219,21 @@ export interface CommanderChatResponse {
   context: Record<string, unknown>
 }
 
+export type CommanderIntent = 'SAFE_ROUTE' | 'HIGH_RISK_VILLAGES' | 'ROAD_ISOLATION' | 'EXPLAIN_RISK' | 'SHELTERS' | 'ANNOUNCEMENT' | 'GENERAL'
+
+export interface CommanderResponseBlock {
+  type: 'text' | 'risk' | 'road' | 'route' | 'shelter' | 'map' | 'evidence' | 'action'
+  data: Record<string, unknown>
+}
+
+export interface CommanderStructuredResponse {
+  type: 'commander_response'
+  intent: CommanderIntent
+  summary: string
+  blocks: CommanderResponseBlock[]
+  source: 'nvidia' | 'fallback'
+}
+
 export interface SavedRoutePlan {
   id: string
   name: string
