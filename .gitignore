@@ -53,3 +53,8 @@ data/tiles/*
 
 # --- Misc ---
 *.pid
+
+# --- Local Commander runtime artifacts and SSH keys ---
+backend/data/
+~
+~.pub
