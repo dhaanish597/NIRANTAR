@@ -1,0 +1,4 @@
+[     143ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=370088c6:14335
+[     338ms] [WARNING] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: WebSocket is closed before the connection is established. @ http://localhost:5173/src/lib/ws.ts:42
+[  295329ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=370088c6:14335
+[  295492ms] [WARNING] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: WebSocket is closed before the connection is established. @ http://localhost:5173/src/lib/ws.ts:42

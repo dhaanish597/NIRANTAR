@@ -1,0 +1,3 @@
+.dashboard-workspace{height:calc(100vh - 116px);min-height:620px}
+.dashboard-workspace>.map-stage{flex:1 1 0%;width:0;height:100%}
+@media(max-width:900px){.dashboard-workspace{height:auto;min-height:0}}

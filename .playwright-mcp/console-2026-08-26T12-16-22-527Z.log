@@ -1,0 +1,6 @@
+[     306ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=a778d1cf:14335
+[     498ms] [WARNING] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: WebSocket is closed before the connection is established. @ http://localhost:5173/src/lib/ws.ts:42
+[    8809ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/whatif/simulate:0
+[  213911ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5173/@vite/client:1002
+[  215965ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=a778d1cf:14335
+[  216118ms] [WARNING] WebSocket connection to 'ws://localhost:8001/ws/ticks' failed: WebSocket is closed before the connection is established. @ http://localhost:5173/src/lib/ws.ts:42

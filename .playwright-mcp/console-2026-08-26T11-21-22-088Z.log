@@ -1,0 +1,17 @@
+[     761ms] [INFO] Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner. @ http://localhost:4173/:0
+[     929ms] [ERROR] Access to fetch at 'http://localhost:8000/api/state' from origin 'http://localhost:4173' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:4173/:0
+[     930ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/state:0
+[     933ms] [ERROR] Access to fetch at 'http://localhost:8000/api/scenarios' from origin 'http://localhost:4173' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:4173/:0
+[     933ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/scenarios:0
+[     940ms] [ERROR] Access to fetch at 'http://localhost:8000/api/aoi/aizawl' from origin 'http://localhost:4173' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:4173/:0
+[     940ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/aoi/aizawl:0
+[   29943ms] [ERROR] Access to fetch at 'http://localhost:8000/api/state' from origin 'http://localhost:4173' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:4173/:0
+[   29944ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/state:0
+[   29945ms] [ERROR] Access to fetch at 'http://localhost:8000/api/scenarios' from origin 'http://localhost:4173' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:4173/:0
+[   29946ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/scenarios:0
+[   29955ms] [ERROR] Access to fetch at 'http://localhost:8000/api/aoi/aizawl' from origin 'http://localhost:4173' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:4173/:0
+[   29956ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/aoi/aizawl:0
+[   29983ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED @ http://localhost:4173/assets/index-B6eKkZwq.js:8
+[   29998ms] [INFO] Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner. @ http://localhost:4173/:0
+[   30508ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED @ http://localhost:4173/assets/index-B6eKkZwq.js:8
+[   31515ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED @ http://localhost:4173/assets/index-B6eKkZwq.js:8

@@ -7,6 +7,9 @@ import type {
   ScenarioSummary,
   WhatIfRequest,
   WhatIfResult,
+  CommanderChatMessage,
+  CommanderChatResponse,
+  SavedRoutePlan,
 } from '../types/schemas'
 import type { DdmaDecisionKind } from './ddma'
 
@@ -77,4 +80,9 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   listAnnouncements: () => request<Announcement[]>('/api/announcements'),
+  commanderChat: (payload: { message: string; history: CommanderChatMessage[]; village_id?: string; aoi_id?: string }) =>
+    request<CommanderChatResponse>('/api/commander/chat', { method: 'POST', body: JSON.stringify(payload) }),
+  saveRoutePlan: (payload: { name: string; aoi_id: string; village_id: string; routes: CommanderChatResponse['routes'] }) =>
+    request<SavedRoutePlan>('/api/commander/saved-routes', { method: 'POST', body: JSON.stringify(payload) }),
+  listSavedRoutePlans: () => request<SavedRoutePlan[]>('/api/commander/saved-routes'),
 }

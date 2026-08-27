@@ -1,278 +1,66 @@
-import type { Geometry } from 'geojson'
+import type { FeatureCollection, Geometry } from 'geojson'
 import { addProtocol, type GeoJSONSource, MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { PMTiles, Protocol } from 'pmtiles'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cellRisksToFeatureCollection } from '../lib/grid'
 import { loadOfflineTileSource } from '../lib/offlineTiles'
 import { roadRisksToFeatureCollection } from '../lib/roads'
 import { villagesToFeatureCollection } from '../lib/villages'
 import { useTickStore } from '../store/useTickStore'
+import { MapControls, type MapLayerKey, type MapLayerState } from './MapControls'
+import { MapLegend } from './MapLegend'
+import './map-workspace.css'
 
-const SOURCE_ID = 'risk-cells'
-const FILL_LAYER_ID = 'risk-cells-fill'
-const OUTLINE_LAYER_ID = 'risk-cells-outline'
+const CENTER: [number, number] = [92.7173, 23.7307]
+const protocol = new Protocol()
+let protocolReady = false
+const empty: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
-// BUILD_PLAN.md task 3.10 (Village View): "an offline map with the route drawn". Rather than
-// build a second map implementation, this is an OPTIONAL extra layer on the SAME self-contained
-// MapView instance every other screen already uses (CLAUDE.md rule 10 — no external tile
-// requests, unchanged). Only rendered when a caller passes real route geometry
-// (decision/routing.py's `EvacuationRoute.geometry`, via `ActionCard.route.geometry`).
-const ROUTE_SOURCE_ID = 'evac-route'
-const ROUTE_LAYER_ID = 'evac-route-line'
-
-// BUILD_PLAN.md task 2.7: road layer coloured by p_blocked, villages as ranked pins. Both draw
-// synthetic geometry (lib/roads.ts, lib/villages.ts) — see those files' docstrings for why: the
-// current schemas (RoadSegmentRisk, SettlementPriority, VillageIsolation) carry no real
-// geometry yet.
-const ROAD_SOURCE_ID = 'road-risks'
-const ROAD_LAYER_ID = 'road-risks-line'
-const VILLAGE_SOURCE_ID = 'villages'
-const VILLAGE_LAYER_ID = 'villages-circle'
-
-// BUILD_PLAN.md task 5.2: a real offline PMTiles reference layer (the AOI's terrain-grid
-// boundaries + real OSM road edges, scripts/build_tiles.py) rendered UNDERNEATH the live per-tick
-// GeoJSON layers above — geographic context that's present even before any tick has arrived, and
-// (once cached, frontend/src/lib/offlineTiles.ts) still there with the network disabled. This is
-// still zero external tile requests: the archive is fetched from THIS origin's own `/tiles/`
-// path (vite.config.ts's offlineTilesPlugin), never a remote tile host — MapView's Phase-0
-// no-basemap-imagery choice (CLAUDE.md rule 10) is unchanged, this is a vector reference layer,
-// not a photographic basemap.
-const OFFLINE_SOURCE_ID = 'offline-tiles'
-const OFFLINE_CELLS_LAYER_ID = 'offline-cells-outline'
-const OFFLINE_ROADS_LAYER_ID = 'offline-roads-line'
-
-// The PMTiles<->MapLibre protocol glue is process-global by design (maplibre-gl's `addProtocol`
-// is a module-level registration, not per-Map) — registered once here, shared by every <MapView>
-// instance (the Ops screen and Village View's route map both render one), rather than fighting
-// over a single global registration from inside the component effect.
-const offlinePmtilesProtocol = new Protocol()
-let offlinePmtilesProtocolRegistered = false
-
-function ensureOfflinePmtilesProtocolRegistered(): void {
-  if (offlinePmtilesProtocolRegistered) return
-  addProtocol('pmtiles', offlinePmtilesProtocol.tile)
-  offlinePmtilesProtocolRegistered = true
-}
-
-// Only Aizawl has a real built archive today (data/static/aizawl/*, data/osm/aizawl_graph.geojson
-// — the only AOI with Phase-1/2 static data at all, same scope every other AOI-specific frontend
-// piece in this codebase already documents, e.g. lib/priorityDetail.ts). Keyed off the loaded
-// AOI id below (falls back to this constant before the real AOI has loaded, matching
-// FALLBACK_CENTER's own pattern), not hardcoded blindly — an AOI with no archive simply fails the
-// fetch and the reference layer is skipped (see `addOfflineReferenceLayer`'s catch below), it
-// does not render another AOI's tiles under the wrong map.
-const DEFAULT_TILES_AOI_ID = 'aizawl'
-
-async function addOfflineReferenceLayer(
-  map: MapLibreMap,
-  aoiId: string,
-  isCancelled: () => boolean,
-): Promise<void> {
-  // Wrapped as one big try/catch, not several small ones: this whole function is a best-effort
-  // enhancement layered on top of the always-real live risk map (task 5.2's own scope — "no
-  // basemap") — any failure in it (a missing archive, a test/environment maplibre-gl mock
-  // lacking `addProtocol`, the map having been torn down mid-await, ...) must degrade to "no
-  // reference layer this session", never crash or surface an unhandled rejection.
-  try {
-    ensureOfflinePmtilesProtocolRegistered()
-    const source = await loadOfflineTileSource(aoiId)
-    if (isCancelled()) return
-
-    offlinePmtilesProtocol.add(new PMTiles(source))
-    const sourceUrl = `pmtiles://${source.getKey()}`
-
-    if (map.getSource(OFFLINE_SOURCE_ID)) return // already added (e.g. React StrictMode re-run)
-    map.addSource(OFFLINE_SOURCE_ID, { type: 'vector', url: sourceUrl })
-    map.addLayer(
-      {
-        id: OFFLINE_CELLS_LAYER_ID,
-        type: 'line',
-        source: OFFLINE_SOURCE_ID,
-        'source-layer': 'cells',
-        paint: { 'line-color': '#334155', 'line-width': 0.5, 'line-opacity': 0.6 },
-      },
-      FILL_LAYER_ID, // insert BELOW the live risk-cell fill layer, not on top of it
-    )
-    map.addLayer(
-      {
-        id: OFFLINE_ROADS_LAYER_ID,
-        type: 'line',
-        source: OFFLINE_SOURCE_ID,
-        'source-layer': 'roads',
-        paint: { 'line-color': '#475569', 'line-width': 1, 'line-opacity': 0.7 },
-      },
-      FILL_LAYER_ID,
-    )
-  } catch (err) {
-    // No archive built for this AOI yet, a fetch failure with nothing cached to fall back on, the
-    // map having been torn down mid-await, or (in tests) a maplibre-gl mock missing `addProtocol`
-    // — the map still renders correctly without this reference layer either way.
-    console.warn(`offline reference tile layer unavailable for AOI ${aoiId}`, err)
-  }
-}
-
-// Fallback center matches the "aizawl" AOI's real center (api/routes.py's _STUB_AOIS) exactly —
-// Phase 0 only ever runs one AOI, so this coincidence is intentional, not fragile. If AOI
-// selection becomes dynamic in a later phase, this component needs a proper "center on first
-// AOI load" path instead of relying on the fallback matching.
-const FALLBACK_CENTER: [number, number] = [92.7173, 23.7307]
-
-export function MapView({ routeGeometry = null }: { routeGeometry?: Geometry | null } = {}) {
+export function MapView({ routeGeometry = null, layers, onLayerChange }: { routeGeometry?: Geometry | null; layers?: MapLayerState; onLayerChange?: (key: MapLayerKey, enabled: boolean) => void } = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
-  const hasCenteredOnAoiRef = useRef(false)
+  const [localLayers, setLocalLayers] = useState<MapLayerState>({ risk: true, rainfall: false, villages: true, shelters: false, roads: true, route: Boolean(routeGeometry) })
+  const activeLayers = layers ?? localLayers
   const aoi = useTickStore((s) => s.aoi)
   const cellRisks = useTickStore((s) => s.cellRisks)
   const roadRisks = useTickStore((s) => s.roadRisks)
   const priorities = useTickStore((s) => s.priorities)
   const isolations = useTickStore((s) => s.isolations)
   const selectVillage = useTickStore((s) => s.selectVillage)
+  const changeLayer = (key: MapLayerKey, enabled: boolean) => { setLocalLayers((current) => ({ ...current, [key]: enabled })); onLayerChange?.(key, enabled) }
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     let cancelled = false
-
-    const map = new MapLibreMap({
-      container: containerRef.current,
-      // Phase 0: no external tile requests. CLAUDE.md rule 10 ("the demo must run with the
-      // network cable unplugged") applies from day one here, not just once Phase 5's PMTiles
-      // offline basemap lands (BUILD_PLAN.md task 5.2) — this style is entirely self-contained.
-      style: {
-        version: 8,
-        sources: {},
-        layers: [
-          { id: 'background', type: 'background', paint: { 'background-color': '#0b1220' } },
-        ],
-      },
-      center: FALLBACK_CENTER,
-      zoom: 13,
-    })
+    const map = new MapLibreMap({ container: containerRef.current, center: CENTER, zoom: 12.7, minZoom: 8, maxZoom: 18, attributionControl: false, style: { version: 8, sources: { osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '© OpenStreetMap contributors' } }, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#dce8e2' } }, { id: 'osm-base', type: 'raster', source: 'osm', paint: { 'raster-opacity': 0.82, 'raster-saturation': -0.35, 'raster-contrast': -0.08 } }] } })
     mapRef.current = map
-
+    const resizeObserver = new ResizeObserver(() => map.resize())
+    resizeObserver.observe(containerRef.current)
     map.on('load', () => {
-      map.addSource(SOURCE_ID, {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
-      map.addLayer({
-        id: FILL_LAYER_ID,
-        type: 'fill',
-        source: SOURCE_ID,
-        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.75 },
-      })
-      map.addLayer({
-        id: OUTLINE_LAYER_ID,
-        type: 'line',
-        source: SOURCE_ID,
-        paint: { 'line-color': '#0b1220', 'line-width': 1 },
-      })
-
-      map.addSource(ROAD_SOURCE_ID, {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
-      map.addLayer({
-        id: ROAD_LAYER_ID,
-        type: 'line',
-        source: ROAD_SOURCE_ID,
-        paint: {
-          'line-color': ['get', 'color'],
-          'line-width': ['case', ['get', 'severed'], 5, 3],
-          'line-dasharray': ['case', ['get', 'severed'], ['literal', [2, 1]], ['literal', [1, 0]]],
-        },
-      })
-
-      map.addSource(VILLAGE_SOURCE_ID, {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
-      map.addLayer({
-        id: VILLAGE_LAYER_ID,
-        type: 'circle',
-        source: VILLAGE_SOURCE_ID,
-        paint: {
-          'circle-radius': 7,
-          'circle-color': ['get', 'color'],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#0b1220',
-        },
-      })
-
-      map.addSource(ROUTE_SOURCE_ID, {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
-      map.addLayer({
-        id: ROUTE_LAYER_ID,
-        type: 'line',
-        source: ROUTE_SOURCE_ID,
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#38bdf8', 'line-width': 4, 'line-dasharray': [0.2, 1.5] },
-      })
-
-      // Task 2.8: clicking a village pin opens VillageDetailDrawer via the shared store action.
-      map.on('click', VILLAGE_LAYER_ID, (event) => {
-        const villageId = event.features?.[0]?.properties?.village_id
-        if (typeof villageId === 'string') selectVillage(villageId)
-      })
-      map.on('mouseenter', VILLAGE_LAYER_ID, () => {
-        map.getCanvas().style.cursor = 'pointer'
-      })
-      map.on('mouseleave', VILLAGE_LAYER_ID, () => {
-        map.getCanvas().style.cursor = ''
-      })
-
-      void addOfflineReferenceLayer(map, DEFAULT_TILES_AOI_ID, () => cancelled)
+      map.addSource('risk-cells', { type: 'geojson', data: empty })
+      map.addLayer({ id: 'risk-cells-fill', type: 'fill', source: 'risk-cells', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.24 } })
+      map.addSource('road-risks', { type: 'geojson', data: empty })
+      map.addLayer({ id: 'road-risks-line', type: 'line', source: 'road-risks', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['case', ['get', 'severed'], 4, 2.5], 'line-opacity': 0.92, 'line-dasharray': ['case', ['get', 'severed'], ['literal', [2, 1]], ['literal', [1, 0]]] } })
+      map.addSource('villages', { type: 'geojson', data: empty, cluster: true, clusterMaxZoom: 11, clusterRadius: 42 })
+      map.addLayer({ id: 'villages-circle', type: 'circle', source: 'villages', filter: ['!', ['has', 'point_count']], paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 4, 13, 7, 16, 10], 'circle-color': ['get', 'color'], 'circle-stroke-width': 2, 'circle-stroke-color': '#f5fbf7' } })
+      map.addLayer({ id: 'villages-label', type: 'symbol', source: 'villages', filter: ['!', ['has', 'point_count']], layout: { 'text-field': ['coalesce', ['get', 'name'], ['get', 'village_id']], 'text-size': 11, 'text-offset': [0, 1.4], 'text-anchor': 'top' }, paint: { 'text-color': '#15353b', 'text-halo-color': '#f2f8f2', 'text-halo-width': 1.2 } })
+      map.addLayer({ id: 'villages-cluster', type: 'circle', source: 'villages', filter: ['has', 'point_count'], paint: { 'circle-color': '#126e70', 'circle-radius': 15, 'circle-stroke-width': 2, 'circle-stroke-color': '#f5fbf7' } })
+      map.addLayer({ id: 'villages-cluster-count', type: 'symbol', source: 'villages', filter: ['has', 'point_count'], layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-size': 11 }, paint: { 'text-color': '#ffffff' } })
+      map.addSource('evac-route', { type: 'geojson', data: empty })
+      map.addLayer({ id: 'evac-route-line', type: 'line', source: 'evac-route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#087f9c', 'line-width': 5, 'line-opacity': 0.9 } })
+      map.on('click', 'villages-circle', (event) => { const id = event.features?.[0]?.properties?.village_id; if (typeof id === 'string') selectVillage(id) })
+      map.on('mouseenter', 'villages-circle', () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', 'villages-circle', () => { map.getCanvas().style.cursor = '' })
+      try { if (!protocolReady) { addProtocol('pmtiles', protocol.tile); protocolReady = true }; void loadOfflineTileSource(aoi?.id ?? 'aizawl').then((source) => { if (cancelled || map.getSource('offline-tiles')) return; protocol.add(new PMTiles(source)); map.addSource('offline-tiles', { type: 'vector', url: `pmtiles://${source.getKey()}` }); map.addLayer({ id: 'offline-roads', type: 'line', source: 'offline-tiles', 'source-layer': 'roads', paint: { 'line-color': ['step', ['zoom'], '#aabeb6', 12, '#94aaa2', 15, '#667f78'], 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.45, 12, 1.1, 16, 2.8], 'line-opacity': 0.82 } }, 'road-risks-line') }) } catch { /* missing local archive is a valid degraded state */ }
     })
+    return () => { cancelled = true; resizeObserver.disconnect(); map.remove(); mapRef.current = null }
+  }, [aoi?.id, selectVillage])
 
-    return () => {
-      cancelled = true
-      map.remove()
-      mapRef.current = null
-    }
-    // selectVillage is a stable Zustand action reference (same function identity for the
-    // store's lifetime), so listing it here satisfies exhaustive-deps without ever re-running
-    // this mount-only effect.
-  }, [selectVillage])
-
-  // Re-center once, the first time the real AOI loads (in case it ever differs from the
-  // fallback) — but never again, so this doesn't fight the user's pan/zoom on every tick.
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map || !aoi || hasCenteredOnAoiRef.current) return
-    map.setCenter([aoi.center.lon, aoi.center.lat])
-    hasCenteredOnAoiRef.current = true
-  }, [aoi])
-
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map || !aoi) return
-    const applyData = () => {
-      const cellSource = map.getSource(SOURCE_ID) as GeoJSONSource | undefined
-      cellSource?.setData(cellRisksToFeatureCollection(cellRisks, aoi.center))
-      const roadSource = map.getSource(ROAD_SOURCE_ID) as GeoJSONSource | undefined
-      roadSource?.setData(roadRisksToFeatureCollection(roadRisks, aoi.center))
-      const villageSource = map.getSource(VILLAGE_SOURCE_ID) as GeoJSONSource | undefined
-      villageSource?.setData(villagesToFeatureCollection(priorities, isolations, aoi.center))
-    }
-    if (map.isStyleLoaded()) applyData()
-    else map.once('load', applyData)
-  }, [cellRisks, roadRisks, priorities, isolations, aoi])
-
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    const applyRoute = () => {
-      const routeSource = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined
-      routeSource?.setData({
-        type: 'FeatureCollection',
-        features: routeGeometry ? [{ type: 'Feature', geometry: routeGeometry, properties: {} }] : [],
-      })
-    }
-    if (map.isStyleLoaded()) applyRoute()
-    else map.once('load', applyRoute)
-  }, [routeGeometry])
-
-  return <div ref={containerRef} className="h-full w-full" />
+  useEffect(() => { const map = mapRef.current; if (!map || !aoi) return; const apply = () => { (map.getSource('risk-cells') as GeoJSONSource | undefined)?.setData(cellRisksToFeatureCollection(cellRisks, aoi.center)); (map.getSource('road-risks') as GeoJSONSource | undefined)?.setData(roadRisksToFeatureCollection(roadRisks, aoi.center)); (map.getSource('villages') as GeoJSONSource | undefined)?.setData(villagesToFeatureCollection(priorities, isolations, aoi.center)) }; if (map.isStyleLoaded()) apply(); else map.once('load', apply) }, [aoi, cellRisks, roadRisks, priorities, isolations])
+  useEffect(() => { const map = mapRef.current; if (!map) return; const apply = () => (map.getSource('evac-route') as GeoJSONSource | undefined)?.setData(routeGeometry ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: routeGeometry, properties: {} }] } : empty); if (map.isStyleLoaded()) apply(); else map.once('load', apply) }, [routeGeometry])
+  useEffect(() => { const map = mapRef.current; if (!map || !map.isStyleLoaded() || typeof map.setLayoutProperty !== 'function') return; const visible = (enabled: boolean) => enabled ? 'visible' : 'none'; map.setLayoutProperty('risk-cells-fill', 'visibility', visible(activeLayers.risk)); map.setLayoutProperty('road-risks-line', 'visibility', visible(activeLayers.roads)); for (const id of ['villages-circle', 'villages-label', 'villages-cluster', 'villages-cluster-count']) map.setLayoutProperty(id, 'visibility', visible(activeLayers.villages)); map.setLayoutProperty('evac-route-line', 'visibility', visible(activeLayers.route && Boolean(routeGeometry))) }, [activeLayers, routeGeometry])
+  const reset = () => { const map = mapRef.current; if (map) map.flyTo({ center: aoi ? [aoi.center.lon, aoi.center.lat] : CENTER, zoom: 12.7, duration: 700 }) }
+  const fullscreen = () => { const element = containerRef.current?.parentElement; if (element && !document.fullscreenElement) void element.requestFullscreen?.(); else void document.exitFullscreen?.() }
+  return <div ref={containerRef} className="map-canvas"><MapControls onZoomIn={() => mapRef.current?.zoomIn({ duration: 350 })} onZoomOut={() => mapRef.current?.zoomOut({ duration: 350 })} onReset={reset} onLocate={reset} onFullscreen={fullscreen} onLayerChange={changeLayer} routeEnabled={Boolean(routeGeometry)} /><MapLegend showRisk={activeLayers.risk} showRoads={activeLayers.roads} /></div>
 }

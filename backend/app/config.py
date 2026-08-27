@@ -8,7 +8,14 @@ same AOI bounding box, so it lives here once instead of drifting across files.
 """
 from __future__ import annotations
 
+import os
+
 from pydantic import BaseModel, Field
+
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
+NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
+NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
+NVIDIA_TIMEOUT_SECONDS = float(os.getenv("NVIDIA_TIMEOUT_SECONDS", "12"))
 
 
 class AoiConfig(BaseModel):

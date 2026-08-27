@@ -1,85 +1,19 @@
+import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { useTickStore } from '../store/useTickStore'
+import { api } from '../lib/api'
+import type { CommanderChatMessage, CommanderChatResponse, CommanderRoute } from '../types/schemas'
 import { NotBuilt } from './NotBuilt'
 
-/** The Government "AI Emergency Commander" top-level workspace (new 5-item IA). Ports the real,
- * data-driven recommendation logic the in-flight ConsoleWorkspaces.tsx rewrite already built
- * (Task 14 retires that file) — unchanged behavior, just remounted at its own route instead of
- * nested under a "Commander" sub-nav that no longer exists. Sub-project 6 replaces this with the
- * full conversational chat interface; this is the real, functional slice Foundation ships. */
-export function CommanderWorkspace({
-  onAnnounce,
-  onWhatIf,
-}: {
-  onAnnounce: () => void
-  onWhatIf: () => void
-}) {
-  const priorities = useTickStore((s) => s.priorities)
-  const roads = useTickStore((s) => s.roadRisks)
-  const top = priorities[0]
+function RouteCard({ item, onSave }: { item: CommanderRoute; onSave: (item: CommanderRoute) => void }) {
+  const route = item.route
+  return <article className="rounded border border-emerald-500/30 bg-emerald-950/30 p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Safe option {item.route_rank}</p><h4 className="mt-1 text-sm font-semibold text-slate-100">{route.shelter_name}</h4></div><button type="button" onClick={() => onSave(item)} className="rounded border border-emerald-400/40 px-2 py-1 text-[10px] font-bold text-emerald-200 hover:bg-emerald-400/10">Save</button></div><p className="mt-2 text-xs text-slate-300">{(route.distance_m / 1000).toFixed(1)} km · {route.est_walk_minutes} min estimated walk</p><p className="mt-2 text-[11px] text-emerald-200">{item.safety_reason}</p>{item.risk_snapshot.map((risk) => <p key={risk} className="mt-1 text-[10px] text-slate-400">{risk}</p>)}</article>
+}
 
-  return (
-    <div className="flex-1 overflow-y-auto bg-slate-950 p-6">
-      <p className="text-xs uppercase tracking-wide text-slate-500">AI Emergency Commander</p>
-      <h1 className="mb-4 text-xl font-bold">Decision support, not autonomous response.</h1>
-      <div className="mb-6 grid gap-4 md:grid-cols-2">
-        <article className="rounded border border-white/10 bg-white/5 p-4">
-          <h2 className="mb-2 text-sm font-semibold text-slate-200">Situation summary</h2>
-          <p className="text-sm text-slate-400">
-            {priorities.length
-              ? `${priorities.filter((x) => x.tier === 'P1').length} P1 villages are currently in the received priority feed.`
-              : 'Awaiting a verified priority feed.'}
-          </p>
-          <p className="text-sm text-slate-400">
-            {roads.length
-              ? `${roads.filter((x) => x.severed).length} road segments are marked severed in the current impact feed.`
-              : 'Awaiting road impact feed.'}
-          </p>
-        </article>
-        <article className="rounded border border-white/10 bg-white/5 p-4">
-          <h2 className="mb-2 text-sm font-semibold text-slate-200">Recommendation</h2>
-          {top ? (
-            <>
-              <p className="text-sm text-slate-300">
-                Consider preparing an announcement for <strong>{top.village_id}</strong>; it is
-                ranked {top.tier} with EPS {top.eps.toFixed(2)}.
-              </p>
-              <h3 className="mt-2 text-xs font-semibold uppercase text-slate-500">Why</h3>
-              <ul className="text-xs text-slate-400">
-                {Object.keys(top.components)
-                  .slice(0, 3)
-                  .map((x) => (
-                    <li key={x}>{x} contributes to the current EPS</li>
-                  ))}
-              </ul>
-            </>
-          ) : (
-            <NotBuilt
-              task="TASK-AI-COMMANDER"
-              what="No recommendation is shown without a current decision-pipeline context."
-              blocks="AI recommendation backend and risk/priority tick"
-            />
-          )}
-        </article>
-      </div>
-      <div className="rounded border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-        <strong>HUMAN-IN-THE-LOOP</strong> — this system proposes. An authorised officer decides.
-        <div className="mt-2 flex gap-2">
-          <button
-            type="button"
-            onClick={onAnnounce}
-            className="rounded bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"
-          >
-            Open Announce
-          </button>
-          <button
-            type="button"
-            onClick={onWhatIf}
-            className="rounded bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"
-          >
-            Run What-if
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+export function CommanderWorkspace({ onAnnounce, onWhatIf }: { onAnnounce: () => void; onWhatIf: () => void }) {
+  const priorities = useTickStore((s) => s.priorities); const roads = useTickStore((s) => s.roadRisks); const aoi = useTickStore((s) => s.aoi); const top = priorities[0]
+  const [messages, setMessages] = useState<CommanderChatMessage[]>([]); const [question, setQuestion] = useState(''); const [loading, setLoading] = useState(false); const [error, setError] = useState<string | null>(null); const [lastResponse, setLastResponse] = useState<CommanderChatResponse | null>(null); const [saved, setSaved] = useState<string | null>(null)
+  async function submit(event: FormEvent) { event.preventDefault(); const message = question.trim(); if (!message || loading) return; const next = [...messages, { role: 'user' as const, content: message }]; setMessages(next); setQuestion(''); setLoading(true); setError(null); try { const response = await api.commanderChat({ message, history: next, village_id: top?.village_id, aoi_id: aoi?.id }); setLastResponse(response); setMessages([...next, { role: 'assistant', content: response.answer }]) } catch (err) { setError(err instanceof Error ? err.message : 'Commander assistant unavailable') } finally { setLoading(false) } }
+  async function saveRoute(item: CommanderRoute) { try { await api.saveRoutePlan({ name: `${item.route.shelter_name} safety plan`, aoi_id: aoi?.id ?? 'unknown', village_id: item.route.village_id, routes: [item] }); setSaved('Route plan saved to the commander backend.') } catch { setSaved('Could not save to the backend. The route remains available in this response.') } }
+  return <div className="commander-workspace flex-1 overflow-y-auto bg-slate-950 p-6"><section className="min-w-0"><p className="text-xs uppercase tracking-wide text-teal-300">AI Emergency Commander</p><h1 className="mb-4 text-xl font-bold">Decision support, not autonomous response.</h1><div className="mb-6 grid gap-4 md:grid-cols-2"><article className="rounded border border-white/10 bg-white/5 p-4"><h2 className="mb-2 text-sm font-semibold text-slate-200">Situation summary</h2><p className="text-sm text-slate-400">{priorities.length ? `${priorities.filter((x) => x.tier === 'P1').length} P1 villages are currently in the received priority feed.` : 'Awaiting a verified priority feed.'}</p><p className="text-sm text-slate-400">{roads.length ? `${roads.filter((x) => x.severed).length} road segments are marked severed in the current impact feed.` : 'Awaiting road impact feed.'}</p></article><article className="rounded border border-white/10 bg-white/5 p-4"><h2 className="mb-2 text-sm font-semibold text-slate-200">Recommendation</h2>{top ? <><p className="text-sm text-slate-300">Consider preparing an announcement for <strong>{top.village_id}</strong>; it is ranked {top.tier} with EPS {top.eps.toFixed(2)}.</p><h3 className="mt-2 text-xs font-semibold uppercase text-slate-500">Why</h3><ul className="text-xs text-slate-400">{Object.keys(top.components).slice(0, 3).map((x) => <li key={x}>{x} contributes to the current EPS</li>)}</ul></> : <NotBuilt task="TASK-AI-COMMANDER" what="No recommendation is shown without a current decision-pipeline context." blocks="AI recommendation backend and risk/priority tick" />}</article></div><div className="rounded border border-white/10 bg-slate-900 p-4"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-sm font-semibold text-slate-100">Commander assistant</h2><p className="text-xs text-slate-500">Ask about the live verified situation or safe movement options.</p></div><span className="rounded border border-teal-500/30 px-2 py-1 text-[10px] uppercase tracking-wide text-teal-300">NVIDIA ready</span></div><div className="mb-4 max-h-56 space-y-3 overflow-y-auto">{messages.map((item, index) => <div key={`${item.role}-${index}`} className={item.role === 'user' ? 'ml-8 rounded bg-teal-950/50 p-3 text-xs text-teal-100' : 'mr-8 rounded bg-white/5 p-3 text-xs leading-relaxed text-slate-300'}>{item.content}</div>)}{loading && <div className="mr-8 rounded bg-white/5 p-3 text-xs text-slate-500">Reviewing the current impact feed…</div>}</div>{lastResponse?.routes.length ? <div className="mb-4 space-y-2"><div className="flex items-center justify-between"><h3 className="text-xs font-bold uppercase tracking-wider text-emerald-300">Verified safety routes</h3><span className="text-[10px] text-slate-500">{lastResponse.routes.length}/3 available</span></div>{lastResponse.routes.map((item) => <RouteCard key={`${item.route_rank}-${item.route.shelter_id}`} item={item} onSave={saveRoute} />)}</div> : null}{lastResponse && lastResponse.routes.length < 3 && <p className="mb-3 text-[10px] text-amber-300">Only verified routes are shown. The current snapshot does not expose three distinct safe alternatives.</p>}{saved && <p className="mb-3 rounded border border-emerald-500/30 bg-emerald-950/30 p-2 text-xs text-emerald-200">{saved}</p>}{error && <p className="mb-3 rounded border border-red-500/30 bg-red-950/30 p-2 text-xs text-red-200">{error}</p>}<form onSubmit={submit} className="flex gap-2"><input aria-label="Ask the commander" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ask: show me safe routes…" className="min-w-0 flex-1 rounded border border-white/10 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600" /><button type="submit" disabled={loading || !question.trim()} className="rounded bg-teal-500 px-4 py-2 text-xs font-bold text-slate-950 disabled:opacity-40">Ask</button></form></div><div className="mt-4 rounded border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"><strong>HUMAN-IN-THE-LOOP</strong> — this system proposes. An authorised officer decides.<div className="mt-2 flex gap-2"><button type="button" onClick={onAnnounce} className="rounded bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20">Open Announce</button><button type="button" onClick={onWhatIf} className="rounded bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20">Run What-if</button></div></div></section></div>
 }

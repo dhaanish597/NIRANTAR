@@ -27,6 +27,8 @@ from app.ingest.factory import build_clock_and_source, load_scenario_or_raise
 from app.pipeline import Pipeline
 from app.schemas.announcement import Announcement
 from app.schemas.mode import RunMode
+from app.schemas.tick import TickResult
+from app.commander.store import CommanderStore
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,8 @@ class AppState:
         self.bus = Bus()
         self.mode = ModeMachine(self.bus)
         self.pipeline = Pipeline()
+        self.latest_tick: TickResult | None = None
+        self.commander_store = CommanderStore()
         # Real Announcements this session has dispatched (Task 3/4, Foundation sub-project).
         # Independent of replay state — an announcement made in LIVE mode stays visible even if a
         # replay starts afterwards, unlike self.pipeline (which IS reassigned on start_replay()).
@@ -155,6 +159,7 @@ class AppState:
 
         async for frame in source.frames():
             tick = pipeline.process(frame, mode=mode_at_start, scenario_id=scenario_id_at_start)
+            self.latest_tick = tick
             self.mode.update_scenario_time(tick.t)
             await self.bus.publish(Topic.TICK, tick)
 

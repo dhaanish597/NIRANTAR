@@ -1,0 +1,56 @@
+- generic [ref=f2e3]:
+  - generic [ref=f2e4]: LIVE
+  - generic [ref=f2e7]:
+    - generic [ref=f2e8]:
+      - generic [ref=f2e9]:
+        - region "Map" [ref=f2e10]
+        - group [ref=f2e11]:
+          - generic "Toggle attribution" [ref=f2e12] [cursor=pointer]
+          - link "MapLibre" [ref=f2e14] [cursor=pointer]:
+            - /url: https://maplibre.org/
+      - generic [ref=f2e15]:
+        - button "Run Case Study" [ref=f2e16]
+        - button "DDMA Console" [ref=f2e17]
+        - button "Village View" [ref=f2e18]
+      - generic [ref=f2e19]: "WebSocket: connecting"
+      - generic [ref=f2e20]:
+        - generic [ref=f2e21]: Install NIRANTAR for offline use
+        - button "Install" [ref=f2e22]
+        - button "Dismiss install prompt" [ref=f2e23]: ✕
+    - complementary [ref=f2e24]:
+      - generic [ref=f2e25]:
+        - heading "Priority list" [level=2] [ref=f2e26]
+        - paragraph [ref=f2e27]: No settlements ranked yet.
+        - list
+      - generic [ref=f2e28]:
+        - heading "Latest action card" [level=2] [ref=f2e29]
+        - paragraph [ref=f2e30]: No action card issued yet.
+      - generic [ref=f2e31]:
+        - heading "Explainability" [level=2] [ref=f2e32]
+        - paragraph [ref=f2e33]: No cell-level risk in the current tick to explain yet.
+      - generic [ref=f2e34]:
+        - heading "False-alarm-cost slider" [level=2] [ref=f2e35]
+        - paragraph [ref=f2e36]: Operational-view risk threshold explainer — see the DDMA Console (task 3.7) for the real per-recommendation Approve/Modify/Reject workflow.
+        - slider "Operating threshold" [ref=f2e37]: "1"
+        - generic [ref=f2e38]:
+          - generic [ref=f2e39]: "0.30"
+          - generic [ref=f2e40]: "0.50"
+          - generic [ref=f2e41]: "0.70"
+        - generic [ref=f2e42]:
+          - generic [ref=f2e43]:
+            - generic [ref=f2e44]: Threshold 0.50
+            - generic [ref=f2e45]: model xgb-terrain-v1
+          - paragraph [ref=f2e46]:
+            - text: 6 of 56 labeled cells flagged (10.7%) —
+            - generic [ref=f2e47]: 4/14
+            - text: known historical events caught, 10 missed.
+          - generic [ref=f2e48]:
+            - term [ref=f2e49]: TP
+            - term [ref=f2e50]: FP
+            - term [ref=f2e51]: FN
+            - term [ref=f2e52]: TN
+            - definition [ref=f2e53]: "4"
+            - definition [ref=f2e54]: "2"
+            - definition [ref=f2e55]: "10"
+            - definition [ref=f2e56]: "40"
+        - paragraph [ref=f2e57]: "Source: data/models/eval_report.md (n=56 labeled cells, one AOI — treat as illustrative, not a stable rate; see the report's own §2). Only the three thresholds actually measured are selectable — no interpolation."

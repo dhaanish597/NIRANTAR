@@ -78,6 +78,15 @@ beforeEach(() => {
 })
 
 describe('CitizenApp — alert tab (ported from VillageView)', () => {
+  it('uses the shared operational shell while keeping citizen language simple', () => {
+    render(<CitizenApp route="alert" onNavigate={vi.fn()} />)
+
+    expect(screen.getByText('NIRANTAR')).toBeInTheDocument()
+    expect(screen.getByText('CITIZEN ACCESS')).toBeInTheDocument()
+    expect(screen.getByText('Live safety feed')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Citizen navigation' })).toBeInTheDocument()
+  })
+
   it('shows a fallback when there is no active alert for any village', () => {
     render(<CitizenApp route="alert" onNavigate={vi.fn()} />)
     expect(screen.getByText(/No active alert for any village right now/)).toBeInTheDocument()

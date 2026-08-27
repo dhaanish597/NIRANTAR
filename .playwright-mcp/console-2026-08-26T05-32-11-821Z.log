@@ -1,0 +1,8 @@
+[    2024ms] [INFO] Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner. @ http://localhost:4321/:0
+[    3966ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[    3967ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/state:0
+[    3970ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/scenarios:0
+[    3970ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/aoi/aizawl:0
+[    6823ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   10205ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   14572ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8

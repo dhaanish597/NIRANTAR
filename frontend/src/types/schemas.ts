@@ -199,3 +199,31 @@ export interface VerificationRecord {
   verifiedBy?: string
   verifiedAt?: string // ISO 8601
 }
+
+export interface CommanderRoute {
+  route_rank: number
+  route: EvacuationRoute
+  safety_reason: string
+  risk_snapshot: string[]
+}
+
+export interface CommanderChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface CommanderChatResponse {
+  answer: string
+  source: 'nvidia' | 'fallback'
+  routes: CommanderRoute[]
+  context: Record<string, unknown>
+}
+
+export interface SavedRoutePlan {
+  id: string
+  name: string
+  aoi_id: string
+  village_id: string
+  routes: CommanderRoute[]
+  created_at: string
+}

@@ -1,0 +1,52 @@
+- generic [ref=f17e3]:
+  - generic [ref=f17e4]: LIVE
+  - generic [ref=f17e7]:
+    - generic [ref=f17e8]:
+      - generic [ref=f17e9]:
+        - region "Map" [ref=f17e10]
+        - group [ref=f17e11]:
+          - generic "Toggle attribution" [ref=f17e12] [cursor=pointer]
+          - link "MapLibre" [ref=f17e14] [cursor=pointer]:
+            - /url: https://maplibre.org/
+      - generic [ref=f17e15]:
+        - button "Run Case Study" [ref=f17e16]
+        - button "DDMA Console" [ref=f17e17]
+        - button "Village View" [ref=f17e18]
+      - generic [ref=f17e19]: "WebSocket: closed"
+    - complementary [ref=f17e20]:
+      - generic [ref=f17e21]:
+        - heading "Priority list" [level=2] [ref=f17e22]
+        - paragraph [ref=f17e23]: No settlements ranked yet.
+        - list
+      - generic [ref=f17e24]:
+        - heading "Latest action card" [level=2] [ref=f17e25]
+        - paragraph [ref=f17e26]: No action card issued yet.
+      - generic [ref=f17e27]:
+        - heading "Explainability" [level=2] [ref=f17e28]
+        - paragraph [ref=f17e29]: No cell-level risk in the current tick to explain yet.
+      - generic [ref=f17e30]:
+        - heading "False-alarm-cost slider" [level=2] [ref=f17e31]
+        - paragraph [ref=f17e32]: Operational-view risk threshold explainer — see the DDMA Console (task 3.7) for the real per-recommendation Approve/Modify/Reject workflow.
+        - slider "Operating threshold" [ref=f17e33]: "1"
+        - generic [ref=f17e34]:
+          - generic [ref=f17e35]: "0.30"
+          - generic [ref=f17e36]: "0.50"
+          - generic [ref=f17e37]: "0.70"
+        - generic [ref=f17e38]:
+          - generic [ref=f17e39]:
+            - generic [ref=f17e40]: Threshold 0.50
+            - generic [ref=f17e41]: model xgb-terrain-v1
+          - paragraph [ref=f17e42]:
+            - text: 6 of 56 labeled cells flagged (10.7%) —
+            - generic [ref=f17e43]: 4/14
+            - text: known historical events caught, 10 missed.
+          - generic [ref=f17e44]:
+            - term [ref=f17e45]: TP
+            - term [ref=f17e46]: FP
+            - term [ref=f17e47]: FN
+            - term [ref=f17e48]: TN
+            - definition [ref=f17e49]: "4"
+            - definition [ref=f17e50]: "2"
+            - definition [ref=f17e51]: "10"
+            - definition [ref=f17e52]: "40"
+        - paragraph [ref=f17e53]: "Source: data/models/eval_report.md (n=56 labeled cells, one AOI — treat as illustrative, not a stable rate; see the report's own §2). Only the three thresholds actually measured are selectable — no interpolation."

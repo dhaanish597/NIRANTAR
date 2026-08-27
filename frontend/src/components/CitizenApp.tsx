@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { queueAcknowledgement } from '../lib/ackQueue'
 import { api } from '../lib/api'
 import { getCitizenReports, queueCitizenReport, type CitizenReportCategory } from '../lib/citizenReports'
-import { STAGE_COLOR } from '../lib/escalation'
 import {
   deriveCachedEmergencyContacts,
   deriveCachedShelters,
@@ -35,6 +34,7 @@ export function CitizenApp({
   const isolations = useTickStore((s) => s.isolations)
   const announcements = useTickStore((s) => s.announcements)
   const openAuditTrail = useTickStore((s) => s.openAuditTrail)
+  const aoi = useTickStore((s) => s.aoi)
 
   // Ported from VillageView.tsx (BUILD_PLAN.md task 3.10): no village login/selection system
   // exists, so the viewer picks among whichever villages currently carry a pending action card.
@@ -88,84 +88,91 @@ export function CitizenApp({
   return (
     <main className="citizen-app">
       <header className="citizen-head">
-        <a href="/console/dashboard" className="citizen-brand">
-          NIRANTAR
+        <a href="/console/dashboard" className="citizen-brand" aria-label="NIRANTAR citizen home">
+          <span className="brand-mark">N</span>
+          <span>
+            NIRANTAR
+            <small>CITIZEN ACCESS</small>
+          </span>
         </a>
-        <a href="/console/dashboard" className="citizen-role">
-          Officer view
-        </a>
-        <button>English ▾</button>
+        <div className="citizen-head-meta">
+          <span className="citizen-live"><i /> LIVE</span>
+          <a href="/console/dashboard" className="citizen-role">Officer view ↗</a>
+        </div>
       </header>
+
+      <div className="citizen-content">
+      <div className="citizen-intro">
+        <div>
+          <p className="eyebrow">Community safety network</p>
+          <p className="citizen-feed-title">Live safety feed</p>
+        </div>
+        <span className="citizen-aoi">{(aoi?.name ?? 'LOCAL AREA').toUpperCase()} / LOCAL</span>
+      </div>
 
       {route === 'alert' &&
         (card ? (
-          <section className="citizen-screen" style={{ backgroundColor: STAGE_COLOR[card.stage] }}>
+          <section className="citizen-screen citizen-alert-screen">
             {villageIds.length > 1 && (
-              <select
-                aria-label="Select village"
-                value={activeVillageId ?? ''}
-                onChange={(event) => setSelectedVillageId(event.target.value)}
-              >
-                {villageIds.map((id) => (
-                  <option key={id} value={id}>
-                    {isolations.find((v) => v.village_id === id)?.name ?? id}
-                  </option>
-                ))}
-              </select>
+              <label className="citizen-village-select">
+                Viewing area
+                <select aria-label="Select village" value={activeVillageId ?? ''} onChange={(event) => setSelectedVillageId(event.target.value)}>
+                  {villageIds.map((id) => <option key={id} value={id}>{isolations.find((v) => v.village_id === id)?.name ?? id}</option>)}
+                </select>
+              </label>
             )}
-            <div className="citizen-alert">
-              <span>{card.stage}</span>
+            <div className={`citizen-alert ${card.stage.toLowerCase()}`}>
+              <div className="citizen-alert-kicker"><span className="severity-dot" /> <span>{card.stage}</span> ALERT <span>· {villageName}</span></div>
               <h1>{card.headline}</h1>
-              <h2>{villageName}</h2>
               <p>{card.reason_plain}</p>
               {card.safe_window_hours && (
-                <p className="mt-2 text-xs opacity-80">
+                <p className="citizen-window">
                   Safe evacuation window: ~{card.safe_window_hours[0].toFixed(1)}–
                   {card.safe_window_hours[1].toFixed(1)} h (estimate, not a prediction of exact timing)
                 </p>
               )}
             </div>
-            <div className="citizen-action">
+            <div className="citizen-card citizen-action">
               <h2>Voice alert</h2>
+              <p className="muted">Listen to the latest instruction in your language.</p>
               {Object.entries(card.audio_urls).length > 0 ? (
                 Object.entries(card.audio_urls).map(([lang, url]) => (
-                  <div key={lang}>
-                    <span>{lang}</span>
+                  <div key={lang} className="audio-row">
+                    <span className="audio-language">{lang}</span>
                     {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                     <audio controls src={url} />
                   </div>
                 ))
               ) : (
-                <button type="button" disabled title="Pre-generated multilingual audio is not built yet.">
-                  ▶ Play voice alert — not yet available
+                <button className="button secondary citizen-disabled" type="button" disabled title="Pre-generated multilingual audio is not built yet.">
+                  Voice alert not available yet
                 </button>
               )}
             </div>
             {card.roads_to_avoid.length > 0 && (
-              <div className="citizen-action">
+              <div className="citizen-card citizen-action two-column-card">
                 <h2>Roads to avoid</h2>
-                <p>{card.roads_to_avoid.join(', ')}</p>
+                <p className="avoid-roads">{card.roads_to_avoid.join(' · ')}</p>
               </div>
             )}
             {card.what_to_carry.length > 0 && (
-              <div className="citizen-action">
+              <div className="citizen-card citizen-action">
                 <h2>What to carry</h2>
-                <ul>
+                <ul className="carry-list">
                   {card.what_to_carry.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
               </div>
             )}
-            <div className="citizen-action">
-              <span>Contact: {card.contact}</span>
+            <div className="citizen-card contact-card">
+              <span>Emergency contact</span><strong>{card.contact}</strong>
             </div>
-            <button className="button" onClick={() => onNavigate('route')}>
-              Safe route
-            </button>
-            <div className="citizen-action">
+            <div className="citizen-actions">
+            <button className="button citizen-primary-action" onClick={() => onNavigate('route')}>View safe route <span>→</span></button>
               {ackState.status !== 'done' && ackState.status !== 'queued' && (
                 <button
+                  className="button secondary"
                   type="button"
                   disabled={ackState.status === 'submitting'}
                   onClick={() => void handleAcknowledge()}
@@ -173,7 +180,7 @@ export function CitizenApp({
                   {ackState.status === 'submitting' ? 'Submitting…' : 'I have evacuated'}
                 </button>
               )}
-              {ackState.status === 'error' && <p>Could not submit: {ackState.error}</p>}
+              {ackState.status === 'error' && <p className="error">Could not submit: {ackState.error}</p>}
               {ackState.status === 'queued' && (
                 <p>Saved — offline. This will be sent automatically once the device is back online.</p>
               )}
@@ -196,21 +203,19 @@ export function CitizenApp({
 
       {route === 'route' &&
         (card ? (
-          <section className="citizen-screen">
-            <h1>Safe route</h1>
-            <div style={{ height: '16rem' }}>
+          <section className="citizen-screen route-screen">
+            <div className="screen-heading"><div><p className="eyebrow">Navigation</p><h1>Safe route</h1></div><span className="route-status">RECOMMENDED</span></div>
+            <div className="citizen-map">
               <MapView routeGeometry={card.route?.geometry ?? null} />
             </div>
-            <p>
-              Shelter: <span>{card.shelter_name}</span>
-              {card.route && ` · ~${card.route.est_walk_minutes} min walk`}
-            </p>
+            <div className="route-summary"><div><span className="eyebrow">Destination</span><strong>{card.shelter_name}</strong></div><div><span className="eyebrow">Estimated walk</span><strong>{card.route ? `${card.route.est_walk_minutes} min` : 'Unavailable'}</strong></div></div>
             {card.route && (
-              <p>
+              <p className="muted route-detail">
                 {(card.route.distance_m / 1000).toFixed(1)} km · approximately{' '}
                 {card.route.est_walk_minutes} min
               </p>
             )}
+            {card.roads_to_avoid.length > 0 && <div className="route-warning"><strong>Roads to avoid</strong><span>{card.roads_to_avoid.join(' · ')}</span></div>}
           </section>
         ) : (
           <NoActiveAlert />
@@ -218,7 +223,7 @@ export function CitizenApp({
 
       {route === 'announcement' && (
         <section className="citizen-screen">
-          <h1>Announcements</h1>
+          <div className="screen-heading"><div><p className="eyebrow">Community updates</p><h1>Announcements</h1></div><span className="screen-count">{announcements.length}</span></div>
           {announcements.length === 0 ? (
             <NotBuilt
               task="TASK-CIT-ANNOUNCEMENT-FEED"
@@ -226,7 +231,7 @@ export function CitizenApp({
               blocks="A DDMA officer sending an announcement from the Announce workspace"
             />
           ) : (
-            <ul>
+            <ul className="announcement-list">
               {announcements.map((a) => (
                 <li key={a.id} className={`citizen-alert ${a.stage.toLowerCase()}`}>
                   <span>{a.stage}</span>
@@ -241,8 +246,8 @@ export function CitizenApp({
       )}
 
       {route === 'report' && (
-        <section className="citizen-screen">
-          <h1>Report an incident</h1>
+        <section className="citizen-screen report-screen">
+          <div className="screen-heading"><div><p className="eyebrow">Help your community</p><h1>Report an incident</h1></div></div>
           <p className="muted">
             Reports are saved in this device's durable prototype queue. They are not marked sent
             until a server accepts them.
@@ -259,7 +264,7 @@ export function CitizenApp({
             Optional note
             <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Describe what you can see" />
           </label>
-          <button className="button secondary" disabled>
+          <button className="button secondary citizen-disabled" disabled>
             Add photo · camera integration pending
           </button>
           <button className="button" onClick={saveReport}>
@@ -272,16 +277,17 @@ export function CitizenApp({
           )}
         </section>
       )}
+      </div>
 
       <div className="offline-status">
-        {offline
+      {offline
           ? `○ Offline · ${queued} item${queued === 1 ? '' : 's'} queued`
           : queued
             ? `↻ Syncing boundary · ${queued} item${queued === 1 ? '' : 's'} queued`
             : '● Online & synced'}
       </div>
 
-      <nav className="citizen-nav">
+      <nav className="citizen-nav" aria-label="Citizen navigation">
         {(['alert', 'route', 'announcement', 'report'] as const).map((item) => (
           <button key={item} className={route === item ? 'active' : ''} onClick={() => onNavigate(item)}>
             {item === 'alert'

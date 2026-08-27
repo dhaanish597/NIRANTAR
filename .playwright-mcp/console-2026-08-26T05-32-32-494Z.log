@@ -1,0 +1,28 @@
+[     398ms] [INFO] Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner. @ http://localhost:4321/:0
+[    2610ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/state:0
+[    2613ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/scenarios:0
+[    2625ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[    2625ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/aoi/aizawl:0
+[    5511ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[    8878ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   13276ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   20662ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   28103ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   35533ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   43099ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   50656ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   59142ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   68573ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   77487ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   89501ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[   98923ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[  106287ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[  113647ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[  121003ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[  128364ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[  135731ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[  143118ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[  150493ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[  157861ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[  165250ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8
+[  172632ms] [ERROR] WebSocket connection to 'ws://localhost:8000/ws/ticks' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:4321/assets/index-Cz21olfn.js:8

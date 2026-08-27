@@ -42,6 +42,7 @@ import { DashboardWorkspace } from './DashboardWorkspace'
 describe('DashboardWorkspace', () => {
   it('renders a Run Case Study trigger', () => {
     render(<DashboardWorkspace />)
+    expect(document.querySelector('.dashboard-workspace')).toBeInTheDocument()
     expect(screen.getByText('Run Case Study')).toBeInTheDocument()
   })
 })

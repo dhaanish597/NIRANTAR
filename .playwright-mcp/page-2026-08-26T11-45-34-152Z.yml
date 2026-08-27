@@ -1,0 +1,62 @@
+- generic [ref=f7e3]:
+  - generic [ref=f7e4]: LIVE
+  - generic [ref=f7e7]:
+    - generic [ref=f7e8]:
+      - generic [ref=f7e9]:
+        - region "Map" [ref=f7e10]
+        - group [ref=f7e11]:
+          - generic "Toggle attribution" [ref=f7e12] [cursor=pointer]
+          - link "MapLibre" [ref=f7e14] [cursor=pointer]:
+            - /url: https://maplibre.org/
+      - generic [ref=f7e15]:
+        - button "Run Case Study" [ref=f7e16]
+        - button "DDMA Console" [ref=f7e17]
+        - button "Village View" [ref=f7e18]
+      - generic [ref=f7e19]: "WebSocket: closed"
+    - complementary [ref=f7e20]:
+      - generic [ref=f7e21]:
+        - heading "Priority list" [level=2] [ref=f7e22]
+        - paragraph [ref=f7e23]: No settlements ranked yet.
+        - list
+      - generic [ref=f7e24]:
+        - heading "Latest action card" [level=2] [ref=f7e25]
+        - paragraph [ref=f7e26]: No action card issued yet.
+      - generic [ref=f7e27]:
+        - heading "Explainability" [level=2] [ref=f7e28]
+        - paragraph [ref=f7e29]: No cell-level risk in the current tick to explain yet.
+      - generic [ref=f7e30]:
+        - heading "False-alarm-cost slider" [level=2] [ref=f7e31]
+        - paragraph [ref=f7e32]: Operational-view risk threshold explainer — see the DDMA Console (task 3.7) for the real per-recommendation Approve/Modify/Reject workflow.
+        - slider "Operating threshold" [ref=f7e33]: "1"
+        - generic [ref=f7e34]:
+          - generic [ref=f7e35]: "0.30"
+          - generic [ref=f7e36]: "0.50"
+          - generic [ref=f7e37]: "0.70"
+        - generic [ref=f7e38]:
+          - generic [ref=f7e39]:
+            - generic [ref=f7e40]: Threshold 0.50
+            - generic [ref=f7e41]: model xgb-terrain-v1
+          - paragraph [ref=f7e42]:
+            - text: 6 of 56 labeled cells flagged (10.7%) —
+            - generic [ref=f7e43]: 4/14
+            - text: known historical events caught, 10 missed.
+          - generic [ref=f7e44]:
+            - term [ref=f7e45]: TP
+            - term [ref=f7e46]: FP
+            - term [ref=f7e47]: FN
+            - term [ref=f7e48]: TN
+            - definition [ref=f7e49]: "4"
+            - definition [ref=f7e50]: "2"
+            - definition [ref=f7e51]: "10"
+            - definition [ref=f7e52]: "40"
+        - paragraph [ref=f7e53]: "Source: data/models/eval_report.md (n=56 labeled cells, one AOI — treat as illustrative, not a stable rate; see the report's own §2). Only the three thresholds actually measured are selectable — no interpolation."
+  - generic [ref=f7e55]:
+    - heading "NIRANTAR — NER Landslide Early Warning" [level=2] [ref=f7e56]
+    - list [ref=f7e57]:
+      - listitem [ref=f7e58]: This map runs LIVE by default. Click Run Case Study to replay a real historical disaster (e.g. Aizawl, 28 May 2024) on an accelerated clock.
+      - listitem [ref=f7e59]: During a replay, watch cells escalate Green → Red, roads get flagged, and the Priority List rank villages P1/P2/P3 in real time.
+      - listitem [ref=f7e60]: Click any village for its evacuation detail, or open the Explainability panel for the plain-language reasoning behind a risk score.
+      - listitem [ref=f7e61]: Everything shown works with the network cable unplugged — nothing here needs live internet.
+    - generic [ref=f7e62]:
+      - generic [ref=f7e63]: Dismissing automatically in 20s…
+      - button "Got it — let's go" [ref=f7e64]
