@@ -1,116 +1,95 @@
 import { useEffect, useState } from 'react'
+import { AnnounceWorkspace } from './components/AnnounceWorkspace'
 import { AuditTrailView } from './components/AuditTrailView'
+import { AuditWorkspace } from './components/AuditWorkspace'
+import { CitizenApp, type CitizenRoute } from './components/CitizenApp'
+import { CommanderWorkspace } from './components/CommanderWorkspace'
+import { ConsoleShell, type GovernmentRoute } from './components/ConsoleShell'
 import { CounterfactualScorecard } from './components/CounterfactualScorecard'
-import { DdmaConsole } from './components/DdmaConsole'
+import { DashboardWorkspace } from './components/DashboardWorkspace'
 import { InstallPrompt } from './components/InstallPrompt'
-import { MapView } from './components/MapView'
-import { ModeBanner } from './components/ModeBanner'
 import { OnboardingOverlay } from './components/OnboardingOverlay'
-import { ReplayControlBar } from './components/ReplayControlBar'
-import { RightRail } from './components/RightRail'
-import { ScenarioPickerModal } from './components/ScenarioPickerModal'
 import { VillageDetailDrawer } from './components/VillageDetailDrawer'
-import { VillageView } from './components/VillageView'
+import { WhatIfWorkspace } from './components/WhatIfWorkspace'
 import { attachAckQueueAutoSync, syncQueuedAcknowledgements } from './lib/ackQueue'
 import { useTickStore } from './store/useTickStore'
 
-// Phase 0 scope: a single hardcoded AOI. Real AOI selection is out of scope until more than one
-// AOI has pre-baked data (BUILD_PLAN.md Phase 1+).
 const AOI_ID = 'aizawl'
 
-// BUILD_PLAN.md tasks 3.7/3.10: no router library is used anywhere in this codebase (see
-// package.json) — a simple local screen switch is the smallest addition consistent with the
-// existing single-page-app structure, rather than introducing react-router for two extra screens.
-type Screen = 'ops' | 'ddma' | 'village'
+const GOVERNMENT_ROUTES: GovernmentRoute[] = ['dashboard', 'commander', 'whatif', 'audit', 'announce']
+const CITIZEN_ROUTES: CitizenRoute[] = ['alert', 'route', 'announcement', 'report']
+
+type Route = `/console/${GovernmentRoute}` | `/citizen/${CitizenRoute}`
+
+function routeFromPath(path: string): Route {
+  const citizenMatch = CITIZEN_ROUTES.find((r) => path.startsWith(`/citizen/${r}`))
+  if (citizenMatch) return `/citizen/${citizenMatch}`
+  const govMatch = GOVERNMENT_ROUTES.find((r) => path.startsWith(`/console/${r}`))
+  return govMatch ? `/console/${govMatch}` : '/console/dashboard'
+}
 
 function App() {
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [screen, setScreen] = useState<Screen>('ops')
+  const [route, setRoute] = useState<Route>(() => routeFromPath(location.pathname))
   const loadInitial = useTickStore((s) => s.loadInitial)
   const connect = useTickStore((s) => s.connect)
   const disconnect = useTickStore((s) => s.disconnect)
-  const hydrateFromOfflineCache = useTickStore((s) => s.hydrateFromOfflineCache)
-  const wsStatus = useTickStore((s) => s.wsStatus)
-  const error = useTickStore((s) => s.error)
+  const hydrate = useTickStore((s) => s.hydrateFromOfflineCache)
+  const hydrateCitizenReports = useTickStore((s) => s.hydrateCitizenReports)
 
   useEffect(() => {
-    // BUILD_PLAN.md task 5.3: read the IndexedDB-cached action cards BEFORE the network calls
-    // below — a citizen opening the app with no connectivity at all still sees the last known
-    // action card while `loadInitial`/`connect` fail quietly in the background, rather than an
-    // empty screen until (never) a first WebSocket tick arrives.
-    void hydrateFromOfflineCache()
+    void hydrate()
+    hydrateCitizenReports()
     void loadInitial(AOI_ID)
     connect()
-    // Queued "I have evacuated" acknowledgements (VillageView.tsx) made while offline are synced
-    // for real the moment the browser's own `online` event fires — attached once, app-wide, not
-    // per-VillageView-mount, so a queued ack still syncs even if the citizen has navigated away
-    // from Village View by the time connectivity returns. Also attempt a sync right now, in case
-    // connectivity was already restored before this mount (the `online` event only fires on a
-    // transition, not on an already-online page load).
     attachAckQueueAutoSync()
     void syncQueuedAcknowledgements()
     return () => disconnect()
-  }, [loadInitial, connect, disconnect, hydrateFromOfflineCache])
+  }, [hydrate, hydrateCitizenReports, loadInitial, connect, disconnect])
 
+  useEffect(() => {
+    const onPop = () => setRoute(routeFromPath(location.pathname))
+    addEventListener('popstate', onPop)
+    return () => removeEventListener('popstate', onPop)
+  }, [])
+
+  const navigate = (next: Route) => {
+    if (location.pathname !== next) history.pushState({}, '', next)
+    setRoute(next)
+    window.scrollTo(0, 0)
+  }
+
+  if (route.startsWith('/citizen/')) {
+    const citizenRoute = route.replace('/citizen/', '') as CitizenRoute
+    return (
+      <>
+        <CitizenApp route={citizenRoute} onNavigate={(r) => navigate(`/citizen/${r}`)} />
+        <OnboardingOverlay />
+        <InstallPrompt />
+      </>
+    )
+  }
+
+  const govRoute = route.replace('/console/', '') as GovernmentRoute
   return (
-    <div className="flex h-screen flex-col">
-      <ModeBanner />
-
-      {screen === 'ops' && (
-        <>
-          <div className="relative flex flex-1 overflow-hidden">
-            <div className="relative flex-1">
-              <MapView />
-              <div className="absolute top-4 left-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen(true)}
-                  className="rounded bg-emerald-600 px-4 py-2 text-sm font-semibold shadow-lg hover:bg-emerald-500"
-                >
-                  Run Case Study
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScreen('ddma')}
-                  className="rounded bg-slate-800 px-4 py-2 text-sm font-semibold shadow-lg hover:bg-slate-700"
-                >
-                  DDMA Console
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScreen('village')}
-                  className="rounded bg-slate-800 px-4 py-2 text-sm font-semibold shadow-lg hover:bg-slate-700"
-                >
-                  Village View
-                </button>
-              </div>
-              {wsStatus !== 'open' && (
-                <div className="absolute bottom-4 left-4 rounded bg-black/60 px-3 py-1.5 text-xs text-slate-300">
-                  WebSocket: {wsStatus}
-                </div>
-              )}
-              {error && (
-                <div className="absolute right-4 bottom-4 rounded bg-red-900/80 px-3 py-1.5 text-xs text-red-100">
-                  {error}
-                </div>
-              )}
-              <InstallPrompt />
-            </div>
-            <RightRail />
-          </div>
-          <ReplayControlBar />
-        </>
-      )}
-
-      {screen === 'ddma' && <DdmaConsole onBack={() => setScreen('ops')} />}
-      {screen === 'village' && <VillageView onBack={() => setScreen('ops')} />}
-
-      <ScenarioPickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} />
+    <>
+      <ConsoleShell route={govRoute} onRoute={(r) => navigate(`/console/${r}`)}>
+        {govRoute === 'dashboard' && <DashboardWorkspace />}
+        {govRoute === 'commander' && (
+          <CommanderWorkspace
+            onAnnounce={() => navigate('/console/announce')}
+            onWhatIf={() => navigate('/console/whatif')}
+          />
+        )}
+        {govRoute === 'whatif' && <WhatIfWorkspace />}
+        {govRoute === 'audit' && <AuditWorkspace />}
+        {govRoute === 'announce' && <AnnounceWorkspace />}
+      </ConsoleShell>
       <VillageDetailDrawer />
-      <CounterfactualScorecard />
       <AuditTrailView />
+      <CounterfactualScorecard />
       <OnboardingOverlay />
-    </div>
+      <InstallPrompt />
+    </>
   )
 }
 
