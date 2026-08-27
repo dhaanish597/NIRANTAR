@@ -8,9 +8,10 @@ beforeEach(() => {
 })
 
 describe('CommanderWorkspace', () => {
-  it('shows a NotBuilt fallback when there is no priority feed yet', () => {
+  it('shows a safe pending state when there is no priority feed yet', () => {
     render(<CommanderWorkspace onAnnounce={vi.fn()} onWhatIf={vi.fn()} />)
-    expect(screen.getByText(/No recommendation is shown/)).toBeInTheDocument()
+    expect(screen.getByText(/Awaiting verified feed/)).toBeInTheDocument()
+    expect(screen.getByText('Commander is ready.')).toBeInTheDocument()
   })
 
   it('recommends the top-ranked village and links to Announce', () => {
