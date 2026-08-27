@@ -146,6 +146,10 @@ export function cellRisksToFeatureCollection(
   const features: Feature<Polygon, CellFeatureProperties>[] = []
 
   for (const risk of cellRisks) {
+    if (risk.geometry) {
+      features.push({ type: 'Feature', geometry: risk.geometry as Polygon, properties: { cell_id: risk.cell_id, p_fail: risk.p_fail, color: colorForPFail(risk.p_fail) } })
+      continue
+    }
     const center = stubCellCenter(risk.cell_id, aoiCenter)
     if (!center) continue
     features.push({

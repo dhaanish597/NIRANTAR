@@ -26,3 +26,5 @@ class CellRisk(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     attributions: list[Attribution] = Field(default_factory=list)
     model_version: str
+    geometry: dict | None = None
+    terrain: dict[str, float | str | None] = Field(default_factory=dict)

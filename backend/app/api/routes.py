@@ -25,7 +25,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.api.announcements import AnnouncementRequest, create_announcement, list_announcements
-from app.api.whatif import WhatIfRequest, WhatIfResult, build_synthetic_frame
+from app.api.whatif import WhatIfRequest, WhatIfResult, simulate_whatif
 from app.audit.producers import record_ddma_decision, record_village_acknowledged
 from app.config import AOIS
 from app.config import get_aoi as get_aoi_config  # aliased: this module's OWN `/api/aoi/{id}`
@@ -257,7 +257,7 @@ async def village_acknowledge(body: VillageAcknowledgeRequest, request: Request)
     )
 
 
-@router.post("/whatif/simulate")
+@router.post("/whatif/simulate", response_model_exclude_none=True)
 async def whatif_simulate(body: WhatIfRequest) -> WhatIfResult:
     """BUILD_PLAN.md task 5.8 — the what-if rainfall simulator: DDMA PRE-POSITIONING SUPPORT, not
     a real alert. "A rainfall slider ('simulate 250 mm over 12 h') that re-runs the pipeline on
@@ -286,11 +286,6 @@ async def whatif_simulate(body: WhatIfRequest) -> WhatIfResult:
 
     t = LiveClock().now()
     try:
-        frame = build_synthetic_frame(body.aoi_id, body.rainfall_mm, body.duration_hours, t=t)
+        return simulate_whatif(body, t=t)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    pipeline = Pipeline()  # throwaway — see docstring above
-    tick = pipeline.process(frame, mode=RunMode.LIVE, scenario_id=None)
-
-    return WhatIfResult(request=body, cell_count=len(frame.cells), tick=tick)

@@ -26,6 +26,8 @@ class RoadSegmentRisk(BaseModel):
     p_blocked: float = Field(ge=0.0, le=1.0)
     severed: bool
     contributing_cells: list[str] = Field(default_factory=list)
+    geometry: dict | None = None
+    affected_settlements: list[str] = Field(default_factory=list)
 
 
 class Demographics(BaseModel):
@@ -50,6 +52,8 @@ class VillageIsolation(BaseModel):
     alternate_route_exists: bool
     est_duration_hours: float | None = None  # ALWAYS labelled "estimate" in UI
     severed_links: list[str] = Field(default_factory=list)
+    geometry: dict | None = None
+    connected_road_ids: list[str] = Field(default_factory=list)
 
 
 class SettlementPriority(BaseModel):

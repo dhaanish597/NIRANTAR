@@ -136,11 +136,12 @@ def test_whatif_endpoint_full_real_run():
     assert any("uniform" in a.lower() for a in body["assumptions"])
     assert body["cell_count"] > 1000
 
-    # --- real ML model actually fired (task 1.17), not just the threshold fallback ---
+    # --- the What-If spatial screening engine fired (the live ML/threshold path is intentionally
+    # not reused because it saturates under synthetic threshold exceedance) ---
     tick = body["tick"]
     assert len(tick["cell_risks"]) == body["cell_count"]
     model_versions = {r["model_version"] for r in tick["cell_risks"]}
-    assert "xgb-terrain-v1" in model_versions
+    assert "whatif-terrain-screening-v1" in model_versions
     assert all(0.0 <= r["p_fail"] <= 1.0 for r in tick["cell_risks"])
 
     # --- the impact/decision chain genuinely ran (task 2.x/3.x wiring, not a stub) ---

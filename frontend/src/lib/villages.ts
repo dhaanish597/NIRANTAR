@@ -71,7 +71,9 @@ export function villagesToFeatureCollection(
   const isolationById = new Map(isolations.map((v) => [v.village_id, v]))
   const features: Feature<Point, VillageFeatureProperties>[] = priorities.map((priority) => {
     const isolation = isolationById.get(priority.village_id)
-    const position = stubVillagePosition(priority.village_id, aoiCenter)
+    const position = isolation?.geometry?.type === 'Point'
+      ? { lat: isolation.geometry.coordinates[1], lon: isolation.geometry.coordinates[0] }
+      : stubVillagePosition(priority.village_id, aoiCenter)
     return {
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [position.lon, position.lat] },

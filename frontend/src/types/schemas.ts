@@ -30,6 +30,8 @@ export interface CellRisk {
   confidence: number
   attributions: Attribution[]
   model_version: string
+  geometry?: Geometry | null
+  terrain?: Record<string, number | string | null>
 }
 
 export interface RoadSegmentRisk {
@@ -40,6 +42,8 @@ export interface RoadSegmentRisk {
   p_blocked: number
   severed: boolean
   contributing_cells: string[]
+  geometry?: Geometry | null
+  affected_settlements?: string[]
 }
 
 export interface Demographics {
@@ -60,6 +64,8 @@ export interface VillageIsolation {
   alternate_route_exists: boolean
   est_duration_hours: number | null
   severed_links: string[]
+  geometry?: Geometry | null
+  connected_road_ids?: string[]
 }
 
 export interface SettlementPriority {
@@ -157,6 +163,14 @@ export interface WhatIfRequest {
   aoi_id: string
   rainfall_mm: number
   duration_hours: number
+  slope_modifier_deg?: number
+  distance_to_fault_km?: number
+  lithology?: 'weak' | 'moderate' | 'competent'
+  antecedent_rainfall_mm?: number
+  soil_moisture_pct?: number
+  snow_mass_mm?: number
+  snow_melt_active?: boolean
+  exposure_weight?: number
 }
 
 /** POST /api/whatif/simulate's response (backend/app/api/whatif.py::WhatIfResult) — a REAL
@@ -166,6 +180,27 @@ export interface WhatIfResult {
   assumptions: string[]
   cell_count: number
   tick: TickResult
+  summary?: WhatIfSummary
+  metadata?: WhatIfMetadata
+}
+
+export interface WhatIfSummary {
+  total_cells: number
+  critical_cells: number
+  high_cells: number
+  total_roads: number
+  roads_at_risk: number
+  severed_roads: number
+  total_settlements: number
+  isolated_settlements: number
+  population_at_risk: number
+}
+
+export interface WhatIfMetadata {
+  source: 'model' | 'demo' | 'fallback'
+  mode: 'simulation'
+  spatial_resolution: string
+  assumptions: string[]
 }
 
 export interface ChannelResultSummary {

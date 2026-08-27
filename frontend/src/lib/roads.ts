@@ -41,6 +41,10 @@ export function roadRisksToFeatureCollection(
   const features: Feature<LineString, RoadFeatureProperties>[] = []
 
   for (const road of roadRisks) {
+    if (road.geometry?.type === 'LineString') {
+      features.push({ type: 'Feature', geometry: road.geometry as LineString, properties: { edge_id: road.edge_id, name: road.name, p_blocked: road.p_blocked, severed: road.severed, is_bridge: road.is_bridge, color: colorForPBlocked(road.p_blocked) } })
+      continue
+    }
     const points = road.contributing_cells
       .map((cellId) => stubCellCenter(cellId, aoiCenter))
       .filter((p): p is { lat: number; lon: number } => p !== null)
