@@ -108,6 +108,33 @@ describe('CitizenApp — alert tab (ported from VillageView)', () => {
     )
     expect(await screen.findByText('✓ Evacuation acknowledged')).toBeInTheDocument()
   })
+
+  it('queues the acknowledgement (not an error) when the request fails, without crashing', async () => {
+    useTickStore.setState({ actionCards: [CARD] })
+    vi.mocked(api.acknowledgeVillage).mockRejectedValue(new Error('network error'))
+
+    render(<CitizenApp route="alert" onNavigate={vi.fn()} />)
+    fireEvent.click(screen.getByText('I have evacuated'))
+
+    await waitFor(() =>
+      expect(screen.getByText(/Saved — offline/)).toBeInTheDocument(),
+    )
+    expect(api.acknowledgeVillage).toHaveBeenCalledWith({ alert_id: 'alert-1', village_id: 'v1' })
+  })
+
+  it('queues immediately without even attempting the request when navigator.onLine is false', async () => {
+    useTickStore.setState({ actionCards: [CARD] })
+    const onLineSpy = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+
+    render(<CitizenApp route="alert" onNavigate={vi.fn()} />)
+    fireEvent.click(screen.getByText('I have evacuated'))
+
+    await waitFor(() =>
+      expect(screen.getByText(/Saved — offline/)).toBeInTheDocument(),
+    )
+    expect(api.acknowledgeVillage).not.toHaveBeenCalled()
+    onLineSpy.mockRestore()
+  })
 })
 
 describe('CitizenApp — route tab (ported from VillageView)', () => {

@@ -118,6 +118,12 @@ export function CitizenApp({
               <h1>{card.headline}</h1>
               <h2>{villageName}</h2>
               <p>{card.reason_plain}</p>
+              {card.safe_window_hours && (
+                <p className="mt-2 text-xs opacity-80">
+                  Safe evacuation window: ~{card.safe_window_hours[0].toFixed(1)}–
+                  {card.safe_window_hours[1].toFixed(1)} h (estimate, not a prediction of exact timing)
+                </p>
+              )}
             </div>
             <div className="citizen-action">
               <h2>Voice alert</h2>
@@ -195,20 +201,15 @@ export function CitizenApp({
             <div style={{ height: '16rem' }}>
               <MapView routeGeometry={card.route?.geometry ?? null} />
             </div>
-            {card.route ? (
-              <>
-                <h2>{card.route.shelter_name}</h2>
-                <p>
-                  {(card.route.distance_m / 1000).toFixed(1)} km · approximately{' '}
-                  {card.route.est_walk_minutes} min
-                </p>
-              </>
-            ) : (
-              <NotBuilt
-                task="TASK-CIT-ROUTE"
-                what="A verified route has not been supplied for this alert."
-                blocks="Routing engine and action-card route geometry"
-              />
+            <p>
+              Shelter: <span>{card.shelter_name}</span>
+              {card.route && ` · ~${card.route.est_walk_minutes} min walk`}
+            </p>
+            {card.route && (
+              <p>
+                {(card.route.distance_m / 1000).toFixed(1)} km · approximately{' '}
+                {card.route.est_walk_minutes} min
+              </p>
             )}
           </section>
         ) : (
