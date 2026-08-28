@@ -18,10 +18,12 @@ const NAV: Array<[GovernmentRoute, string]> = [
 export function ConsoleShell({
   route,
   onRoute,
+  onCitizenNavigate,
   children,
 }: {
   route: GovernmentRoute
   onRoute: (route: GovernmentRoute) => void
+  onCitizenNavigate: () => void
   children: ReactNode
 }) {
   const aoi = useTickStore((s) => s.aoi)
@@ -49,9 +51,9 @@ export function ConsoleShell({
           <span>Current tick</span>
           <strong>{tick ? new Date(tick).toLocaleString() : 'Awaiting feed'}</strong>
         </div>
-        <a className="role-switch" href="/citizen/alert">
+        <button className="role-switch" type="button" onClick={onCitizenNavigate}>
           Citizen demo ↗
-        </a>
+        </button>
       </header>
       <nav className="primary-nav" aria-label="Government workspaces">
         {NAV.map(([key, label]) => (

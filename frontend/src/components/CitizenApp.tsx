@@ -26,9 +26,13 @@ type AckState =
 export function CitizenApp({
   route,
   onNavigate,
+  onOfficerNavigate = () => {
+    window.location.assign('/console/dashboard')
+  },
 }: {
   route: CitizenRoute
   onNavigate: (route: CitizenRoute) => void
+  onOfficerNavigate?: () => void
 }) {
   const actionCards = useTickStore((s) => s.actionCards)
   const isolations = useTickStore((s) => s.isolations)
@@ -88,16 +92,16 @@ export function CitizenApp({
   return (
     <main className="citizen-app">
       <header className="citizen-head">
-        <a href="/console/dashboard" className="citizen-brand" aria-label="NIRANTAR citizen home">
+        <button className="citizen-brand" type="button" onClick={() => onNavigate('alert')} aria-label="NIRANTAR citizen home">
           <span className="brand-mark">N</span>
           <span>
             NIRANTAR
             <small>CITIZEN ACCESS</small>
           </span>
-        </a>
+        </button>
         <div className="citizen-head-meta">
           <span className="citizen-live"><i /> LIVE</span>
-          <a href="/console/dashboard" className="citizen-role">Officer view ↗</a>
+          <button className="citizen-role" type="button" onClick={onOfficerNavigate}>Officer view ↗</button>
         </div>
       </header>
 
@@ -204,11 +208,20 @@ export function CitizenApp({
       {route === 'route' &&
         (card ? (
           <section className="citizen-screen route-screen">
-            <div className="screen-heading"><div><p className="eyebrow">Navigation</p><h1>Safe route</h1></div><span className="route-status">RECOMMENDED</span></div>
-            <div className="citizen-map">
-              <MapView routeGeometry={card.route?.geometry ?? null} />
-            </div>
-            <div className="route-summary"><div><span className="eyebrow">Destination</span><strong>{card.shelter_name}</strong></div><div><span className="eyebrow">Estimated walk</span><strong>{card.route ? `${card.route.est_walk_minutes} min` : 'Unavailable'}</strong></div></div>
+            <div className="screen-heading"><div><p className="eyebrow">Navigation</p><h1>Safe route</h1></div><span className="route-status">{card.route ? 'RECOMMENDED' : 'UNAVAILABLE'}</span></div>
+            {card.route ? (
+              <>
+                <div className="citizen-map">
+                  <MapView routeGeometry={card.route.geometry} />
+                </div>
+                <div className="route-summary"><div><span className="eyebrow">Destination</span><strong>{card.route.shelter_name}</strong></div><div><span className="eyebrow">Estimated walk</span><strong>{card.route.est_walk_minutes} min</strong></div></div>
+              </>
+            ) : (
+              <div className="not-built">
+                <strong>Route unavailable</strong>
+                <span>No verified safe route is available for this alert in the current feed. Contact DDMA for guidance.</span>
+              </div>
+            )}
             {card.route && (
               <p className="muted route-detail">
                 {(card.route.distance_m / 1000).toFixed(1)} km · approximately{' '}

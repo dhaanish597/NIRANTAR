@@ -68,6 +68,7 @@ interface TickStoreState {
   hydrateCitizenReports: () => void
   queueCitizenReport: (input: Pick<CitizenReport, 'category' | 'note'>) => void
   applyAnnouncement: (announcement: Announcement) => void
+  setAnnouncements: (announcements: Announcement[]) => void
   setVerification: (alertId: string, record: VerificationRecord) => void
 
   connect: () => void
@@ -125,8 +126,15 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
 
   applyAnnouncement: (announcement) =>
     set((state) => ({
-      announcements: [announcement, ...state.announcements].slice(0, MAX_ANNOUNCEMENTS),
+      announcements: [announcement, ...state.announcements.filter((item) => item.id !== announcement.id)].slice(0, MAX_ANNOUNCEMENTS),
     })),
+  setAnnouncements: (announcements) =>
+    set((state) => {
+      const merged = [...announcements, ...state.announcements]
+      return {
+        announcements: merged.filter((item, index) => merged.findIndex((candidate) => candidate.id === item.id) === index).slice(0, MAX_ANNOUNCEMENTS),
+      }
+    }),
 
   setVerification: (alertId, record) =>
     set((state) => ({

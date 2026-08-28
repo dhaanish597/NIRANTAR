@@ -12,6 +12,7 @@ import { OnboardingOverlay } from './components/OnboardingOverlay'
 import { VillageDetailDrawer } from './components/VillageDetailDrawer'
 import { WhatIfWorkspace } from './components/WhatIfWorkspace'
 import { attachAckQueueAutoSync, syncQueuedAcknowledgements } from './lib/ackQueue'
+import { api } from './lib/api'
 import { useTickStore } from './store/useTickStore'
 
 const AOI_ID = 'aizawl'
@@ -35,16 +36,22 @@ function App() {
   const disconnect = useTickStore((s) => s.disconnect)
   const hydrate = useTickStore((s) => s.hydrateFromOfflineCache)
   const hydrateCitizenReports = useTickStore((s) => s.hydrateCitizenReports)
+  const setAnnouncements = useTickStore((s) => s.setAnnouncements)
 
   useEffect(() => {
     void hydrate()
     hydrateCitizenReports()
     void loadInitial(AOI_ID)
+    // Socket announcements only cover messages sent after connection. Hydrate the current list
+    // as well so a citizen opening the app after an officer dispatch still sees the alert.
+    if (typeof api.listAnnouncements === 'function') {
+      void api.listAnnouncements().then(setAnnouncements).catch(() => undefined)
+    }
     connect()
     attachAckQueueAutoSync()
     void syncQueuedAcknowledgements()
     return () => disconnect()
-  }, [hydrate, hydrateCitizenReports, loadInitial, connect, disconnect])
+  }, [hydrate, hydrateCitizenReports, loadInitial, connect, disconnect, setAnnouncements])
 
   useEffect(() => {
     const onPop = () => setRoute(routeFromPath(location.pathname))
@@ -62,7 +69,11 @@ function App() {
     const citizenRoute = route.replace('/citizen/', '') as CitizenRoute
     return (
       <>
-        <CitizenApp route={citizenRoute} onNavigate={(r) => navigate(`/citizen/${r}`)} />
+        <CitizenApp
+          route={citizenRoute}
+          onNavigate={(r) => navigate(`/citizen/${r}`)}
+          onOfficerNavigate={() => navigate('/console/dashboard')}
+        />
         <OnboardingOverlay />
         <InstallPrompt />
       </>
@@ -72,7 +83,11 @@ function App() {
   const govRoute = route.replace('/console/', '') as GovernmentRoute
   return (
     <>
-      <ConsoleShell route={govRoute} onRoute={(r) => navigate(`/console/${r}`)}>
+      <ConsoleShell
+        route={govRoute}
+        onRoute={(r) => navigate(`/console/${r}`)}
+        onCitizenNavigate={() => navigate('/citizen/alert')}
+      >
         {govRoute === 'dashboard' && <DashboardWorkspace />}
         {govRoute === 'commander' && (
           <CommanderWorkspace
