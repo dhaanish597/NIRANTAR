@@ -1,3 +1,25 @@
+/** Compact operational legend: a continuous risk gradient (matching MapView's heatmap ramp)
+ * rather than four disconnected swatches, plus the road-status key. Spec §12. */
 export function MapLegend({ showRisk, showRoads }: { showRisk: boolean; showRoads: boolean }) {
-  return <div className="map-legend"><div className="map-legend-title">Map key <span>current view</span></div>{showRisk && <div className="legend-section"><strong>Risk overlay</strong><span><i className="legend-swatch low" />Low</span><span><i className="legend-swatch moderate" />Moderate</span><span><i className="legend-swatch high" />High</span><span><i className="legend-swatch critical" />Critical</span></div>}{showRoads && <div className="legend-section"><strong>Road hazards</strong><span><i className="legend-line normal" />Normal</span><span><i className="legend-line hazard" />High risk</span><span><i className="legend-line blocked" />Blocked</span></div>}<p className="legend-note">Overlay values from the current {showRisk ? 'risk' : 'impact'} feed.</p></div>
+  return (
+    <div className="map-legend">
+      <div className="map-legend-title">Map key <span>current view</span></div>
+      {showRisk && (
+        <div className="legend-section">
+          <strong>Landslide risk (model / scenario)</strong>
+          <div className="legend-gradient" aria-hidden="true" />
+          <div className="legend-gradient-labels"><span>Low</span><span>Moderate</span><span>High</span><span>Critical</span></div>
+        </div>
+      )}
+      {showRoads && (
+        <div className="legend-section">
+          <strong>Roads</strong>
+          <span><i className="legend-line normal" />Open</span>
+          <span><i className="legend-line hazard" />High blockage risk</span>
+          <span><i className="legend-line blocked" />Severed</span>
+        </div>
+      )}
+      <p className="legend-note">Risk is model/scenario probability, not certainty.</p>
+    </div>
+  )
 }

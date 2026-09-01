@@ -18,6 +18,11 @@ ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite dev server, CLAUDE.md §8
     "http://127.0.0.1:5173",
 ]
+# Vite hops to 5174/5175/... whenever 5173 is already taken (a second checkout, a stale process),
+# and there is no production deployment of this service — a real deploy would set explicit
+# origins from the environment. Allow any localhost port in dev so a port hop doesn't silently
+# break every API call with an opaque CORS error.
+ALLOWED_ORIGIN_REGEX = r"^http://(localhost|127\.0\.0\.1):\d+$"
 
 
 def create_app(*, realtime: bool = True, citizen_report_data_dir: Path | None = None) -> FastAPI:
@@ -35,6 +40,7 @@ def create_app(*, realtime: bool = True, citizen_report_data_dir: Path | None = 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
+        allow_origin_regex=ALLOWED_ORIGIN_REGEX,
         allow_methods=["*"],
         allow_headers=["*"],
     )
