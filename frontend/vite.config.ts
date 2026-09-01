@@ -7,6 +7,21 @@ import { VitePWA } from 'vite-plugin-pwa'
 // vitest/config re-exports vite's defineConfig with the `test` field typed in.
 import { defineConfig } from 'vitest/config'
 
+function offlineAssetManifestEntries() {
+  const tilesDir = path.resolve(import.meta.dirname, '../data/tiles')
+  if (!fs.existsSync(tilesDir)) return []
+  return fs.readdirSync(tilesDir).flatMap((name) => {
+    const url = name.endsWith('.pmtiles')
+      ? `/tiles/${name}`
+      : name.endsWith('-hillshade.png')
+        ? `/terrain/${name}`
+        : null
+    if (!url) return []
+    const stat = fs.statSync(path.join(tilesDir, name))
+    return [{ url, revision: `${stat.size}-${Math.trunc(stat.mtimeMs)}` }]
+  })
+}
+
 // BUILD_PLAN.md task 5.2: serves data/tiles/*.pmtiles (built by scripts/build_tiles.py, gitignored
 // per CLAUDE.md rule 15 — same "produced by scripts/, never committed" status as data/osm/*.pkl)
 // at same-origin `/tiles/<name>.pmtiles`, in BOTH `vite dev` and a real `vite build` + static
@@ -27,24 +42,32 @@ function offlineTilesPlugin(): Plugin {
     name: 'nirantar-serve-offline-tiles',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith('/tiles/')) return next()
-        const requested = decodeURIComponent(req.url.slice('/tiles/'.length))
+        const prefix = req.url?.startsWith('/tiles/')
+          ? '/tiles/'
+          : req.url?.startsWith('/terrain/')
+            ? '/terrain/'
+            : null
+        if (!prefix) return next()
+        const requested = decodeURIComponent(req.url!.slice(prefix.length))
         // Reject path traversal / nested paths outright — this only ever serves a flat
         // <aoi>.pmtiles file directly out of data/tiles/, nothing else.
-        if (!/^[\w-]+\.pmtiles$/.test(requested)) return next()
+        const allowed = prefix === '/tiles/' ? /^[\w-]+\.pmtiles$/ : /^[\w-]+-hillshade\.png$/
+        if (!allowed.test(requested)) return next()
         const filePath = path.join(tilesDir, requested)
         if (!fs.existsSync(filePath)) return next()
-        res.setHeader('Content-Type', 'application/octet-stream')
+        res.setHeader('Content-Type', requested.endsWith('.png') ? 'image/png' : 'application/octet-stream')
         fs.createReadStream(filePath).pipe(res)
       })
     },
     closeBundle() {
       if (!fs.existsSync(tilesDir)) return
       const outDir = path.resolve(import.meta.dirname, 'dist/tiles')
+      const terrainDir = path.resolve(import.meta.dirname, 'dist/terrain')
       fs.mkdirSync(outDir, { recursive: true })
+      fs.mkdirSync(terrainDir, { recursive: true })
       for (const name of fs.readdirSync(tilesDir)) {
-        if (!name.endsWith('.pmtiles')) continue
-        fs.copyFileSync(path.join(tilesDir, name), path.join(outDir, name))
+        if (name.endsWith('.pmtiles')) fs.copyFileSync(path.join(tilesDir, name), path.join(outDir, name))
+        if (name.endsWith('-hillshade.png')) fs.copyFileSync(path.join(tilesDir, name), path.join(terrainDir, name))
       }
     },
   }
@@ -137,6 +160,7 @@ export default defineConfig({
         // worker-dependent map render (this task's offline layer included) would silently break
         // the moment the app is opened fully offline, even after a first successful online visit.
         globPatterns: ['**/*.{js,mjs,css,html,svg,png,ico,webmanifest}'],
+        additionalManifestEntries: offlineAssetManifestEntries(),
       },
     }),
   ],

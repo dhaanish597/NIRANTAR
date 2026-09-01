@@ -66,6 +66,27 @@ class TestBuildSyntheticFrame:
         assert obs.antecedent_15d == pytest.approx(250.0)
         assert obs.antecedent_30d == pytest.approx(250.0)
 
+    def test_supplied_antecedent_rainfall_is_added_without_spatial_fabrication(self):
+        frame = build_synthetic_frame(
+            "aizawl",
+            250.0,
+            12.0,
+            t=LiveClock().now(),
+            antecedent_rainfall_mm=80.0,
+        )
+        assert {obs.antecedent_7d for obs in frame.cells} == {330.0}
+
+    def test_soil_moisture_is_labelled_surface_proxy_fraction(self):
+        frame = build_synthetic_frame(
+            "aizawl",
+            100.0,
+            6.0,
+            t=LiveClock().now(),
+            soil_moisture_pct=78.0,
+        )
+        assert {obs.soil_moisture for obs in frame.cells} == {0.78}
+        assert frame.provenance["soil_moisture"] == "surface_proxy_top_5_cm"
+
     def test_every_cell_gets_the_identical_uniform_rainfall_profile(self):
         frame = build_synthetic_frame("aizawl", 100.0, 6.0, t=LiveClock().now())
         rain_1h_values = {obs.rain_1h for obs in frame.cells}
@@ -136,12 +157,17 @@ def test_whatif_endpoint_full_real_run():
     assert any("uniform" in a.lower() for a in body["assumptions"])
     assert body["cell_count"] > 1000
 
-    # --- the What-If spatial screening engine fired (the live ML/threshold path is intentionally
-    # not reused because it saturates under synthetic threshold exceedance) ---
+    # --- the same real model/threshold pipeline used by replay fired ---
     tick = body["tick"]
+    assert tick["mode"] == "replay"
+    assert tick["scenario_id"] == "whatif-aizawl"
     assert len(tick["cell_risks"]) == body["cell_count"]
     model_versions = {r["model_version"] for r in tick["cell_risks"]}
-    assert "whatif-terrain-screening-v1" in model_versions
+    assert "whatif-terrain-screening-v1" not in model_versions
+    assert any(
+        version.startswith("xgb_") or version == "threshold_only_v1"
+        for version in model_versions
+    )
     assert all(0.0 <= r["p_fail"] <= 1.0 for r in tick["cell_risks"])
 
     # --- the impact/decision chain genuinely ran (task 2.x/3.x wiring, not a stub) ---

@@ -1,5 +1,16 @@
 .PHONY: up down dev dev-backend dev-frontend data graph tiles train scenario test demo-check freeze
 
+UV ?= uv
+DEMO_PY := $(UV) run --isolated --python 3.13 \
+	--with-requirements backend/requirements.txt \
+	--with-requirements backend/requirements-geo.txt \
+	--with-requirements backend/requirements-graph.txt \
+	--with-requirements backend/requirements-ml.txt \
+	--with-requirements backend/requirements-dissemination.txt \
+	--with-requirements backend/requirements-ingest.txt \
+	--with-requirements backend/requirements-db.txt \
+	--with-requirements backend/requirements-tiles.txt
+
 # backend/.venv layout differs Windows vs. POSIX — resolve once here so every target that needs
 # the venv's python (not whatever `python` happens to be first on PATH) uses the right one.
 # Caught the hard way: `python -m pytest` here originally picked up an unrelated global Python
@@ -29,12 +40,13 @@ dev-backend:
 dev-frontend:
 	cd frontend && npm run dev
 
-# --- Phase 1+ targets: stubs for now, real implementations land with their phase ---
 data:
-	@echo "TODO(Phase 1): scripts/fetch_dem.py + build_grid.py + fetch_exposure.py for AOI=$(AOI)"
+	backend/$(VENV_PY) scripts/fetch_dem.py --aoi $(if $(AOI),$(AOI),aizawl)
+	backend/$(VENV_PY) scripts/build_grid.py --aoi $(if $(AOI),$(AOI),aizawl)
+	backend/$(VENV_PY) scripts/fetch_exposure.py --aoi $(if $(AOI),$(AOI),aizawl)
 
 graph:
-	@echo "TODO(Phase 2): scripts/build_road_graph.py for AOI=$(AOI)"
+	backend/$(VENV_PY) scripts/build_road_graph.py --aoi $(if $(AOI),$(AOI),aizawl)
 
 # BUILD_PLAN.md task 5.2: real, not a stub — builds data/tiles/<AOI>.pmtiles from the AOI's
 # already-built cells.gpkg (task 1.2) + road graph GeoJSON (task 2.1). Requires both to exist
@@ -42,6 +54,7 @@ graph:
 # two Phase-1/2 targets above are still TODO stubs, unrelated to this one).
 tiles:
 	backend/$(VENV_PY) scripts/build_tiles.py --aoi $(if $(AOI),$(AOI),aizawl)
+	backend/$(VENV_PY) scripts/build_hillshade.py --aoi $(if $(AOI),$(AOI),aizawl)
 
 train:
 	@echo "TODO(Phase 1): ml/train.py"
@@ -59,7 +72,9 @@ test:
 	cd backend && $(VENV_PY) -m pytest -q
 	cd frontend && npm test -- --run
 
-# Phase 0: demo-check is just "does the smoke scenario complete end to end". Grows in Phase 5.
 demo-check:
-	@echo "demo-check (Phase 0 skeleton): smoke scenario must complete end to end."
-	cd backend && $(VENV_PY) -m pytest tests/test_smoke_scenario.py -q
+	@echo "ICONIX DEMO CHECK"
+	PYTHONPATH=backend $(DEMO_PY) python scripts/demo_check.py
+	PYTHONPATH=backend $(DEMO_PY) pytest backend/tests -q -p no:cacheprovider
+	npm --prefix frontend test -- --run
+	npm --prefix frontend run build

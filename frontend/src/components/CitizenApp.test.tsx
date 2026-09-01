@@ -38,7 +38,7 @@ vi.mock('maplibre-gl', () => {
     }
     remove() {}
   }
-  return { MapLibreMap: FakeMap }
+  return { MapLibreMap: FakeMap, addProtocol: vi.fn() }
 })
 
 vi.mock('../lib/api', () => ({
@@ -74,7 +74,13 @@ const CARD: ActionCard = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  useTickStore.setState({ actionCards: [], isolations: [], announcements: [] })
+  useTickStore.setState({
+    actionCards: [],
+    isolations: [],
+    announcements: [],
+    latestTick: null,
+    modeState: { mode: 'live', scenario_id: null, scenario_time: null, speed_factor: 1, paused: false },
+  })
 })
 
 describe('CitizenApp — alert tab (ported from VillageView)', () => {
@@ -83,8 +89,17 @@ describe('CitizenApp — alert tab (ported from VillageView)', () => {
 
     expect(screen.getByText('NIRANTAR')).toBeInTheDocument()
     expect(screen.getByText('CITIZEN ACCESS')).toBeInTheDocument()
-    expect(screen.getByText('Live safety feed')).toBeInTheDocument()
+    expect(screen.getByText('Safety feed')).toBeInTheDocument()
+    expect(screen.getByText('LIVE · STUB FEED')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Citizen navigation' })).toBeInTheDocument()
+  })
+
+  it('labels reconstructed replay data truthfully', () => {
+    useTickStore.setState({
+      modeState: { mode: 'replay', scenario_id: 'aizawl-2024', scenario_time: null, speed_factor: 1, paused: false },
+    })
+    render(<CitizenApp route="alert" onNavigate={vi.fn()} />)
+    expect(screen.getByText('REPLAY · RECONSTRUCTED')).toBeInTheDocument()
   })
 
   it('shows a fallback when there is no active alert for any village', () => {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../lib/api'
 import { queueCitizenReport } from '../lib/citizenReports'
-import type { Announcement, AuditEvent, TickResult } from '../types/schemas'
+import type { Announcement, AuditEvent, RiskForecast, TickResult } from '../types/schemas'
 import { useTickStore } from './useTickStore'
 
 // Only applyTick is exercised here — connect()/disconnect() open a real WebSocket, which is
@@ -123,6 +123,32 @@ describe('applyTick', () => {
     useTickStore.getState().applyTick(makeTick({ road_risks: [], isolations: [] }))
     expect(useTickStore.getState().roadRisks).toHaveLength(0)
     expect(useTickStore.getState().isolations).toHaveLength(0)
+  })
+})
+
+describe('forecast isolation', () => {
+  it('never replaces authoritative map arrays with fallback forecast data', () => {
+    const operationalCell = {
+      cell_id: 'operational', p_fail: 0.7, threshold_exceedance: 0.7,
+      confidence: 0.8, attributions: [], model_version: 'test',
+    }
+    const forecastCell = { ...operationalCell, cell_id: 'forecast' }
+    useTickStore.getState().applyTick(makeTick({ cell_risks: [operationalCell] }))
+    const forecast: RiskForecast = {
+      location: 'Aizawl', location_id: 'aizawl', generated_at: '2026-01-01T00:00:00Z',
+      source: 'FALLBACK',
+      forecast: [{
+        date: '2026-01-01', day_label: 'TODAY', risk_level: 'HIGH', risk_probability: 0.7,
+        rainfall_mm: 20, confidence: 0.5, primary_driver: 'Fallback', explanation: 'Fallback',
+        affected_villages: 0, affected_road_segments: 0, cell_risks: [forecastCell],
+        road_risks: [], isolations: [], priorities: [], areas: [],
+      }],
+    }
+
+    useTickStore.getState().setForecast(forecast)
+    useTickStore.getState().selectForecastDay(forecast.forecast[0])
+
+    expect(useTickStore.getState().cellRisks.map((cell) => cell.cell_id)).toEqual(['operational'])
   })
 })
 

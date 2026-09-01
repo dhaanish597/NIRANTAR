@@ -73,13 +73,13 @@ and `is_reconstructed=False`; a scenario source sets `source="scenario:<id>"` an
 | `core/mode.py` | `LIVE ⇄ REPLAY` transitions | replay control calls | `ModeState`, mode-change bus events | `start_replay`, `pause`, `resume`, `set_speed`, `stop_replay`. |
 | `core/bus.py` | in-process pub/sub | — | topic subscriptions | One topic per pipeline stage; used to fan out tick progress to the WS hub. |
 | `ingest/base.py` | the `DataSource` protocol | — | `AsyncIterator[ObservationFrame]` | Contract only; no logic. |
-| `ingest/live/` | real feed adapters (Phase 1+) | external APIs | `ObservationFrame` | Stubbed with fabricated values in Phase 0. |
+| `ingest/live/` | real feed adapters and explicitly labelled deterministic stub | external APIs or local stub config | `ObservationFrame` | External adapters are optional; replay never calls them. |
 | `ingest/replay/scenario_source.py` | reading a scenario JSON on the `ScenarioClock`'s schedule | `data/scenarios/<id>.json` | `ObservationFrame` (`is_reconstructed=True`) | Drives the "Run Case Study" demo. |
-| `risk/` | turning observations into `p_fail` | `ObservationFrame` | `list[CellRisk]` | Phase 0: deterministic fake function of rainfall. Phase 1: threshold engine + XGBoost. |
-| `impact/` | runout, road isolation, settlement priority | `list[CellRisk]` | `RunoutEnvelope`, `RoadSegmentRisk`, `VillageIsolation`, `SettlementPriority` | Phase 2. Phase 0 stubs return a fixed small set. |
-| `decision/` | routing, escalation stage, action cards | impact outputs | `EvacuationRoute`, `ActionCard`, escalation transitions | Phase 3. Phase 0 stubs one fixed `ActionCard`. |
-| `dissemination/` | CAP 1.2 XML, simulated channel sends, TTS | `ActionCard` | channel send records | Phase 3. Not wired in Phase 0. |
-| `audit/` | append-only hash-chained event log | events from every stage above | `list[AuditEvent]` | Phase 0 writes one `AI_FLAGGED` event per tick so the audit trail is real from day one. |
+| `risk/` | threshold fusion, XGBoost inference, SHAP | `ObservationFrame` + static terrain | `list[CellRisk]` | Real model output where data matches; threshold-only fallback is labelled. |
+| `impact/` | runout, road isolation, settlement priority | `list[CellRisk]` + local DEM/OSM/exposure | `RunoutEnvelope`, `RoadSegmentRisk`, `VillageIsolation`, `SettlementPriority` | Real spatial/network calculations for all registered AOIs. |
+| `decision/` | routing, escalation stage, action cards | impact outputs | `EvacuationRoute`, `ActionCard`, escalation transitions | Risk-aware routes and safe-window ranges are deterministic in replay. |
+| `dissemination/` | CAP 1.2 XML, simulated channel sends | approved `ActionCard` | channel send records | Channels are explicitly simulated demo integrations. |
+| `audit/` | append-only hash-chained event log | events from every stage above | `list[AuditEvent]` | Stable alert identity links AI flag, card, approval, dissemination, and acknowledgement. |
 | `api/` | FastAPI REST routers | schema objects from all of the above | HTTP responses | `GET /api/aoi/{id}`, `GET /api/scenarios`, `POST /api/replay/start`, `POST /api/replay/stop`, `GET /api/state`. |
 | `ws/` | the `/ws/ticks` hub | bus events | `TickResult` broadcast | One channel; every connected client gets every tick. |
 

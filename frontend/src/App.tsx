@@ -7,17 +7,19 @@ import { CommanderWorkspace } from './components/CommanderWorkspace'
 import { ConsoleShell, type GovernmentRoute } from './components/ConsoleShell'
 import { CounterfactualScorecard } from './components/CounterfactualScorecard'
 import { DashboardWorkspace } from './components/DashboardWorkspace'
+import { CitizenReportsWorkspace } from './components/CitizenReportsWorkspace'
 import { InstallPrompt } from './components/InstallPrompt'
 import { OnboardingOverlay } from './components/OnboardingOverlay'
 import { VillageDetailDrawer } from './components/VillageDetailDrawer'
 import { WhatIfWorkspace } from './components/WhatIfWorkspace'
 import { attachAckQueueAutoSync, syncQueuedAcknowledgements } from './lib/ackQueue'
+import { syncQueuedCitizenReports } from './lib/citizenReports'
 import { api } from './lib/api'
 import { useTickStore } from './store/useTickStore'
 
 const AOI_ID = 'aizawl'
 
-const GOVERNMENT_ROUTES: GovernmentRoute[] = ['dashboard', 'commander', 'whatif', 'audit', 'announce']
+const GOVERNMENT_ROUTES: GovernmentRoute[] = ['dashboard', 'commander', 'whatif', 'audit', 'announce', 'reports']
 const CITIZEN_ROUTES: CitizenRoute[] = ['alert', 'route', 'announcement', 'report']
 
 type Route = `/console/${GovernmentRoute}` | `/citizen/${CitizenRoute}`
@@ -50,7 +52,10 @@ function App() {
     connect()
     attachAckQueueAutoSync()
     void syncQueuedAcknowledgements()
-    return () => disconnect()
+    void syncQueuedCitizenReports(api.submitCitizenReport)
+    const syncReports = () => void syncQueuedCitizenReports(api.submitCitizenReport)
+    addEventListener('online', syncReports)
+    return () => { removeEventListener('online', syncReports); disconnect() }
   }, [hydrate, hydrateCitizenReports, loadInitial, connect, disconnect, setAnnouncements])
 
   useEffect(() => {
@@ -62,6 +67,13 @@ function App() {
   const navigate = (next: Route) => {
     if (location.pathname !== next) history.pushState({}, '', next)
     setRoute(next)
+    window.scrollTo(0, 0)
+  }
+
+  const navigateToReports = (reportId?: string) => {
+    const path = `/console/reports${reportId ? `?report=${encodeURIComponent(reportId)}` : ''}`
+    history.pushState({}, '', path)
+    setRoute('/console/reports')
     window.scrollTo(0, 0)
   }
 
@@ -88,7 +100,7 @@ function App() {
         onRoute={(r) => navigate(`/console/${r}`)}
         onCitizenNavigate={() => navigate('/citizen/alert')}
       >
-        {govRoute === 'dashboard' && <DashboardWorkspace />}
+        {govRoute === 'dashboard' && <DashboardWorkspace onOpenReports={navigateToReports} />}
         {govRoute === 'commander' && (
           <CommanderWorkspace
             onAnnounce={() => navigate('/console/announce')}
@@ -98,6 +110,7 @@ function App() {
         {govRoute === 'whatif' && <WhatIfWorkspace />}
         {govRoute === 'audit' && <AuditWorkspace />}
         {govRoute === 'announce' && <AnnounceWorkspace />}
+        {govRoute === 'reports' && <CitizenReportsWorkspace />}
       </ConsoleShell>
       <VillageDetailDrawer />
       <AuditTrailView />

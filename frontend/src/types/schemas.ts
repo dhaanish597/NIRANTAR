@@ -154,6 +154,7 @@ export interface AoiInfo {
   id: string
   name: string
   center: { lat: number; lon: number }
+  bbox?: [number, number, number, number]
   note?: string
 }
 
@@ -163,14 +164,85 @@ export interface WhatIfRequest {
   aoi_id: string
   rainfall_mm: number
   duration_hours: number
-  slope_modifier_deg?: number
-  distance_to_fault_km?: number
-  lithology?: 'weak' | 'moderate' | 'competent'
   antecedent_rainfall_mm?: number
   soil_moisture_pct?: number
-  snow_mass_mm?: number
-  snow_melt_active?: boolean
-  exposure_weight?: number
+}
+
+export type ForecastSource = 'LIVE' | 'MODEL' | 'FALLBACK'
+
+export interface ForecastArea {
+  id: string
+  name: string
+  risk_probability: number
+  risk_level: string
+}
+
+export interface RiskForecastDay {
+  date: string
+  day_label: string
+  risk_level: string
+  risk_probability: number
+  rainfall_mm: number
+  confidence: number
+  primary_driver: string
+  explanation: string
+  affected_villages: number
+  affected_road_segments: number
+  cell_risks: CellRisk[]
+  road_risks: RoadSegmentRisk[]
+  isolations: VillageIsolation[]
+  priorities: SettlementPriority[]
+  areas: ForecastArea[]
+}
+
+export interface RiskForecast {
+  location: string
+  location_id: string
+  generated_at: string
+  source: ForecastSource
+  forecast: RiskForecastDay[]
+}
+
+export type CitizenReportCategory = 'Slope crack' | 'Blocked road' | 'Rockfall or debris' | 'Water seepage' | 'Retaining wall damage' | 'Other'
+export type CitizenReportStatus = 'submitted' | 'acknowledged' | 'in_review' | 'actioned' | 'dismissed'
+export interface CitizenReportTrace {
+  step_name: 'Ingestion' | 'Classification' | 'Dedup' | 'Hotspot' | 'Forecast' | 'Urgency' | 'Recommendation'
+  step_order: number
+  detail: string
+  source: 'deterministic' | 'nvidia'
+  created_at: string
+}
+export interface CitizenReportRecord {
+  id: string
+  aoi_id: string
+  category: CitizenReportCategory
+  citizen_selected_category: CitizenReportCategory
+  description: string
+  lat: number
+  lon: number
+  accuracy_m: number | null
+  image_url: string
+  image_mime_type: string
+  image_width: number | null
+  image_height: number | null
+  image_size_bytes: number
+  quality_score: number
+  relevance_score: number
+  severity: number
+  classification_source: 'nvidia' | 'fallback'
+  classification_reasoning: string
+  duplicate_of: string | null
+  hotspot_count: number
+  forecast_next_7_days: number
+  current_aoi_max_p_fail: number | null
+  urgency_score: number
+  recommendation: string
+  status: CitizenReportStatus
+  officer_id: string | null
+  officer_notes: string
+  created_at: string
+  updated_at: string
+  agent_traces: CitizenReportTrace[]
 }
 
 /** POST /api/whatif/simulate's response (backend/app/api/whatif.py::WhatIfResult) — a REAL
@@ -197,7 +269,7 @@ export interface WhatIfSummary {
 }
 
 export interface WhatIfMetadata {
-  source: 'model' | 'demo' | 'fallback'
+  source: 'model'
   mode: 'simulation'
   spatial_resolution: string
   assumptions: string[]

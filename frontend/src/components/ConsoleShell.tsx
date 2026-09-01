@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useTickStore } from '../store/useTickStore'
 
-export type GovernmentRoute = 'dashboard' | 'commander' | 'whatif' | 'audit' | 'announce'
+export type GovernmentRoute = 'dashboard' | 'commander' | 'whatif' | 'audit' | 'announce' | 'reports'
 
 const NAV: Array<[GovernmentRoute, string]> = [
   ['dashboard', 'Dashboard'],
@@ -9,6 +9,7 @@ const NAV: Array<[GovernmentRoute, string]> = [
   ['whatif', 'What-if Simulator'],
   ['audit', 'Audit'],
   ['announce', 'Announce'],
+  ['reports', 'Community Reports'],
 ]
 
 /** The Government shell — 5 flat top-level workspaces (SIH26001 master frontend prompt §3),

@@ -4,6 +4,7 @@ onto one AppState instance. See docs/ARCHITECTURE.md §3 for what each module ow
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,10 +20,13 @@ ALLOWED_ORIGINS = [
 ]
 
 
-def create_app(*, realtime: bool = True) -> FastAPI:
+def create_app(*, realtime: bool = True, citizen_report_data_dir: Path | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        app.state.app_state = AppState(realtime=realtime)
+        app.state.app_state = AppState(
+            realtime=realtime,
+            citizen_report_data_dir=citizen_report_data_dir,
+        )
         app.state.app_state.start()  # begin the LIVE stub tick stream immediately
         yield
         await app.state.app_state.shutdown()
@@ -41,6 +45,17 @@ def create_app(*, realtime: bool = True) -> FastAPI:
     @app.get("/healthz")
     async def healthz() -> dict:
         return {"status": "ok"}
+
+    @app.get("/")
+    async def root() -> dict:
+        return {
+            "service": "NIRANTAR",
+            "description": "NER landslide early-warning decision and dissemination API",
+            "status": "ok",
+            "docs": "/docs",
+            "health": "/healthz",
+            "citizen_reports": "/api/citizen-reports",
+        }
 
     return app
 

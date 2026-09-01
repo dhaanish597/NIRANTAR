@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -298,23 +299,58 @@ def zonal_terrain_stats(
 # default ("python-requests/x.x") gets a flat 406 from this server (found by actually running
 # this against the real API, not assumed).
 _OVERPASS_USER_AGENT = "NIRANTAR-SIH26001/0.1 (research prototype; contact 240186.cs@rmkec.ac.in)"
+_OVERPASS_URLS = (
+    "https://overpass.osm.ch/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+)
+_OVERPASS_MAX_RETRIES = 6
 
 
 def fetch_osm_roads(bbox_lonlat: tuple[float, float, float, float]) -> list[LineString]:
+    for aoi_id in ("aizawl", "wayanad", "tupul"):
+        graph_path = REPO_ROOT / "data" / "osm" / f"{aoi_id}_graph.geojson"
+        if not graph_path.is_file():
+            continue
+        aoi = get_aoi(aoi_id)
+        if tuple(aoi.bbox) != tuple(bbox_lonlat):
+            continue
+        roads = gpd.read_file(graph_path)
+        return [geometry for geometry in roads.geometry if isinstance(geometry, LineString)]
+
     min_lon, min_lat, max_lon, max_lat = bbox_lonlat
     query = (
         "[out:json][timeout:90];"
         f'way["highway"]({min_lat},{min_lon},{max_lat},{max_lon});'
         "out geom;"
     )
-    response = requests.post(
-        "https://overpass-api.de/api/interpreter",
-        data={"data": query},
-        timeout=120,
-        headers={"User-Agent": _OVERPASS_USER_AGENT},
-    )
-    response.raise_for_status()
-    data = response.json()
+    retryable = {429, 502, 503, 504}
+    data = None
+    last_error: Exception | None = None
+    for attempt in range(_OVERPASS_MAX_RETRIES):
+        url = _OVERPASS_URLS[attempt % len(_OVERPASS_URLS)]
+        try:
+            response = requests.post(
+                url,
+                data={"data": query},
+                timeout=150,
+                headers={"User-Agent": _OVERPASS_USER_AGENT},
+            )
+            if response.status_code in retryable:
+                wait_s = max(float(response.headers.get("Retry-After", 0) or 0), 15.0 * (attempt + 1))
+                print(f"  Overpass HTTP {response.status_code} from {url}, retrying in {wait_s:.0f}s ...")
+                time.sleep(wait_s)
+                continue
+            response.raise_for_status()
+            data = response.json()
+            break
+        except requests.RequestException as exc:
+            last_error = exc
+            wait_s = 15.0 * (attempt + 1)
+            print(f"  Overpass request failed via {url}: {exc}; retrying in {wait_s:.0f}s ...")
+            time.sleep(wait_s)
+    if data is None:
+        raise RuntimeError("Overpass road query failed across all configured public endpoints") from last_error
 
     lines = []
     for element in data.get("elements", []):

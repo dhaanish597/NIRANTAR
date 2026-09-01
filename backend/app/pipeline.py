@@ -222,6 +222,10 @@ class Pipeline:
 
         # ---- risk (task 1.17/1.19, real ML + threshold-engine fallback — ruling 1/2) ----
         cell_risks, _unmatched_ids = _compute_cell_risks(frame)
+        # One logical alert identity spans this AOI's replay/live recommendation lifecycle.
+        # Event IDs remain tick-specific for audit ordering; cards and follow-up events carry this
+        # stable deterministic identity.
+        alert_id = f"alert-{frame.aoi_id}-{scenario_id or 'live'}"
 
         # AI_FLAGGED is appended HERE — right after risk, before impact/decision — not at the end
         # of this method, even though it was historically written last (Phase 0). Escalation
@@ -235,7 +239,7 @@ class Pipeline:
         # tick, before any consequence (an escalation) that observation produces.
         ai_flagged_event = self.audit_log.append(
             event_id=f"evt-{frame.aoi_id}-{frame.t.isoformat()}",
-            alert_id=f"tick-{frame.aoi_id}-{frame.t.isoformat()}",
+            alert_id=alert_id,
             kind="AI_FLAGGED",
             actor="system",
             t=frame.t,
@@ -322,6 +326,7 @@ class Pipeline:
                         now=frame.t,
                         route=route,
                         safe_window=safe_window,
+                        alert_id=alert_id,
                     )
                 )
         except (FileNotFoundError, KeyError):

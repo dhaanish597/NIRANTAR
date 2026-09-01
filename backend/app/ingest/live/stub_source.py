@@ -11,12 +11,16 @@ from typing import AsyncIterator
 from app.core.clock import Clock
 from app.schemas.ingest import CellObservation, ObservationFrame
 
-# Same 3x3 block used by data/scenarios/_smoke.json, so Phase 0's two DataSource
-# implementations exercise the same AOI shape.
 STUB_CELL_IDS = [
-    f"aizawl_{row}{col}"
-    for row in ("40", "41", "42")
-    for col in ("1", "2", "3")
+    "aizawl_012_001",
+    "aizawl_039_050",
+    "aizawl_044_048",
+    "aizawl_040_026",
+    "aizawl_022_001",
+    "aizawl_003_024",
+    "aizawl_026_040",
+    "aizawl_029_040",
+    "aizawl_054_046",
 ]
 
 
@@ -59,6 +63,9 @@ class StubLiveSource:
                 t=t,
                 aoi_id=self._aoi_id,
                 cells=cells,
-                provenance={"confidence": "fabricated", "note": "Phase 0 stub live source"},
+                provenance={
+                    "confidence": "fabricated",
+                    "note": "Deterministic local LIVE stub; not a measured weather feed",
+                },
             )
             await asyncio.sleep(self._interval_seconds)

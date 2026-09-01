@@ -13,7 +13,8 @@ router = APIRouter(prefix="/api/commander")
 @router.post("/chat", response_model=CommanderChatResponse)
 async def commander_chat(body: CommanderChatRequest, request: Request):
     state = request.app.state.app_state
-    return await answer(body, state.latest_tick, api_key=NVIDIA_API_KEY, model=NVIDIA_MODEL, base_url=NVIDIA_BASE_URL, timeout=NVIDIA_TIMEOUT_SECONDS)
+    api_key = None if state.mode.state.mode.value == "replay" else NVIDIA_API_KEY
+    return await answer(body, state.latest_tick, api_key=api_key, model=NVIDIA_MODEL, base_url=NVIDIA_BASE_URL, timeout=NVIDIA_TIMEOUT_SECONDS)
 
 
 @router.get("/saved-routes", response_model=list[SavedRoutePlan])

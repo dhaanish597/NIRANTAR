@@ -34,7 +34,7 @@ vi.mock('maplibre-gl', () => {
     }
     remove() {}
   }
-  return { MapLibreMap: FakeMap }
+  return { MapLibreMap: FakeMap, addProtocol: vi.fn() }
 })
 
 import { DashboardWorkspace } from './DashboardWorkspace'

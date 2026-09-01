@@ -22,9 +22,11 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.api.announcements import AnnouncementRequest, create_announcement, list_announcements
+from app.citizen_reports.images import decode_image_data_url
 from app.api.whatif import WhatIfRequest, WhatIfResult, simulate_whatif
 from app.audit.producers import record_ddma_decision, record_village_acknowledged
 from app.config import AOIS
@@ -38,8 +40,16 @@ from app.ingest.factory import SCENARIOS_DIR, UnknownScenarioError, load_scenari
 from app.pipeline import Pipeline
 from app.schemas.announcement import Announcement
 from app.schemas.audit import AuditEvent
+from app.schemas.citizen_report import (
+    CitizenReport,
+    CitizenReportStatus,
+    CitizenReportStatusUpdate,
+    CitizenReportSubmit,
+)
 from app.schemas.decision import ActionCard
 from app.schemas.mode import ModeState, RunMode
+from app.schemas.forecast import RiskForecast
+from app.risk.forecast import build_forecast
 
 router = APIRouter(prefix="/api")
 
@@ -64,6 +74,87 @@ async def get_aoi(aoi_id: str) -> dict:
         "center": {"lat": aoi.center_lat, "lon": aoi.center_lon},
         "bbox": list(aoi.bbox),
     }
+
+
+@router.get("/risk/forecast", response_model=RiskForecast)
+async def get_risk_forecast(request: Request, location_id: str = "aizawl") -> RiskForecast:
+    """Return five dynamically dated forecast snapshots for the selected AOI.
+
+    The current application has no forward weather feed, so the adapter is explicitly FALLBACK;
+    it remains spatially consistent with the latest pipeline tick and is deterministic per refresh.
+    """
+    try:
+        aoi = get_aoi_config(location_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    tick = _app_state(request).latest_tick if request is not None else None
+    return build_forecast(aoi.id, aoi.name, tick)
+
+
+@router.post("/citizen-reports", response_model=CitizenReport, status_code=201)
+async def submit_citizen_report(body: CitizenReportSubmit, request: Request) -> CitizenReport:
+    """Run a geotagged photo through the seven-stage Civic Pulse-derived workflow."""
+    try:
+        aoi = get_aoi_config(body.aoi_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    try:
+        image = decode_image_data_url(body.image_data_url)
+        app_state = _app_state(request)
+        return await app_state.citizen_report_workflow.submit(
+            body,
+            image=image,
+            aoi=aoi,
+            now=LiveClock().now(),
+            latest_tick=app_state.latest_tick,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/citizen-reports", response_model=list[CitizenReport])
+async def list_citizen_reports(
+    request: Request,
+    aoi_id: str | None = None,
+    status: CitizenReportStatus | None = None,
+) -> list[CitizenReport]:
+    return _app_state(request).citizen_report_store.list(aoi_id=aoi_id, status=status)
+
+
+@router.get("/citizen-reports/{report_id}", response_model=CitizenReport)
+async def get_citizen_report(report_id: str, request: Request) -> CitizenReport:
+    report = _app_state(request).citizen_report_store.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="citizen report not found")
+    return report
+
+
+@router.get("/citizen-reports/{report_id}/image")
+async def get_citizen_report_image(report_id: str, request: Request) -> FileResponse:
+    app_state = _app_state(request)
+    report = app_state.citizen_report_store.get(report_id)
+    image_path = app_state.citizen_report_store.image_path(report_id)
+    if report is None or image_path is None:
+        raise HTTPException(status_code=404, detail="citizen report image not found")
+    return FileResponse(image_path, media_type=report.image_mime_type)
+
+
+@router.patch("/citizen-reports/{report_id}/status", response_model=CitizenReport)
+async def update_citizen_report_status(
+    report_id: str,
+    body: CitizenReportStatusUpdate,
+    request: Request,
+) -> CitizenReport:
+    report = _app_state(request).citizen_report_store.update_status(
+        report_id,
+        status=body.status,
+        officer_id=body.officer_id,
+        notes=body.notes.strip(),
+        updated_at=LiveClock().now(),
+    )
+    if report is None:
+        raise HTTPException(status_code=404, detail="citizen report not found")
+    return report
 
 
 @router.get("/scenarios")

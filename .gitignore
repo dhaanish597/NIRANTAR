@@ -53,8 +53,14 @@ data/tiles/*
 
 # --- Misc ---
 *.pid
+*.log
 
 # --- Local Commander runtime artifacts and SSH keys ---
 backend/data/
+data/*.sqlite3
 ~
 ~.pub
+
+# --- Vendored reference project (own git repo; source for the Civic Pulse-derived
+#     crowdsourced-reporting slice). Not part of the NIRANTAR tree. ---
+CivicPulse/

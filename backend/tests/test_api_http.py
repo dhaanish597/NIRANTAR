@@ -40,6 +40,15 @@ def test_healthz():
     assert response.json() == {"status": "ok"}
 
 
+def test_root_describes_api_and_citizen_reports():
+    with make_client() as client:
+        response = client.get("/")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["service"] == "NIRANTAR"
+    assert body["citizen_reports"] == "/api/citizen-reports"
+
+
 def test_get_state_starts_live():
     with make_client() as client:
         response = client.get("/api/state")

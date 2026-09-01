@@ -39,6 +39,9 @@ export function CitizenApp({
   const announcements = useTickStore((s) => s.announcements)
   const openAuditTrail = useTickStore((s) => s.openAuditTrail)
   const aoi = useTickStore((s) => s.aoi)
+  const modeState = useTickStore((s) => s.modeState)
+  const latestTick = useTickStore((s) => s.latestTick)
+  const mode = latestTick?.mode ?? modeState?.mode ?? 'live'
 
   // Ported from VillageView.tsx (BUILD_PLAN.md task 3.10): no village login/selection system
   // exists, so the viewer picks among whichever villages currently carry a pending action card.
@@ -54,6 +57,10 @@ export function CitizenApp({
   const [offline, setOffline] = useState(!navigator.onLine)
   const [category, setCategory] = useState<CitizenReportCategory>('Blocked road')
   const [note, setNote] = useState('')
+  const [photo, setPhoto] = useState<string | null>(null)
+  const [coordinates, setCoordinates] = useState({ lat: 23.7307, lon: 92.7173, accuracyM: null as number | null })
+  const [locationStatus, setLocationStatus] = useState('Using the Aizawl AOI centre until location is shared.')
+  const [reportStatus, setReportStatus] = useState<{ kind: 'idle' | 'sending' | 'success' | 'queued' | 'error'; message?: string }>({ kind: 'idle' })
 
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine)
@@ -84,9 +91,54 @@ export function CitizenApp({
   }
 
   const saveReport = () => {
-    queueCitizenReport({ category, note: note.trim() })
+    if (!photo) {
+      setReportStatus({ kind: 'error', message: 'Add a photo before submitting this report.' })
+      return
+    }
+    queueCitizenReport({ category, note: note.trim(), aoiId: aoi?.id ?? 'aizawl', lat: coordinates.lat, lon: coordinates.lon, accuracyM: coordinates.accuracyM, imageDataUrl: photo })
     setQueued(getCitizenReports().filter((r) => r.status === 'queued').length)
     setNote('')
+    setPhoto(null)
+    setReportStatus({ kind: 'queued', message: 'Saved offline. It will be sent when this device reconnects.' })
+  }
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus('Location is unavailable in this browser; the AOI centre will be used.')
+      return
+    }
+    setLocationStatus('Requesting your location…')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoordinates({ lat: position.coords.latitude, lon: position.coords.longitude, accuracyM: position.coords.accuracy })
+        setLocationStatus(`Location shared (±${Math.round(position.coords.accuracy)} m).`)
+      },
+      () => setLocationStatus('Location permission was not granted; the AOI centre will be used.'),
+      { enableHighAccuracy: true, timeout: 8000 },
+    )
+  }
+
+  const submitReport = async () => {
+    if (!photo) {
+      setReportStatus({ kind: 'error', message: 'Add a photo before submitting this report.' })
+      return
+    }
+    const payload = { aoi_id: aoi?.id ?? 'aizawl', category, description: note.trim(), lat: coordinates.lat, lon: coordinates.lon, accuracy_m: coordinates.accuracyM, image_data_url: photo }
+    if (!navigator.onLine) {
+      saveReport()
+      return
+    }
+    setReportStatus({ kind: 'sending' })
+    try {
+      const result = await api.submitCitizenReport(payload)
+      setReportStatus({ kind: 'success', message: `Received as ${result.id}. ${result.recommendation}` })
+      setNote('')
+      setPhoto(null)
+    } catch (error) {
+      queueCitizenReport({ category, note: note.trim(), aoiId: payload.aoi_id, lat: payload.lat, lon: payload.lon, accuracyM: payload.accuracy_m, imageDataUrl: payload.image_data_url })
+      setQueued(getCitizenReports().filter((r) => r.status === 'queued').length)
+      setReportStatus({ kind: 'queued', message: `Server unavailable. Saved securely on this device for retry. ${error instanceof Error ? '' : ''}` })
+    }
   }
 
   return (
@@ -100,7 +152,7 @@ export function CitizenApp({
           </span>
         </button>
         <div className="citizen-head-meta">
-          <span className="citizen-live"><i /> LIVE</span>
+          <span className="citizen-live"><i /> {mode === 'replay' ? 'REPLAY · RECONSTRUCTED' : 'LIVE · STUB FEED'}</span>
           <button className="citizen-role" type="button" onClick={onOfficerNavigate}>Officer view ↗</button>
         </div>
       </header>
@@ -109,7 +161,7 @@ export function CitizenApp({
       <div className="citizen-intro">
         <div>
           <p className="eyebrow">Community safety network</p>
-          <p className="citizen-feed-title">Live safety feed</p>
+          <p className="citizen-feed-title">Safety feed</p>
         </div>
         <span className="citizen-aoi">{(aoi?.name ?? 'LOCAL AREA').toUpperCase()} / LOCAL</span>
       </div>
@@ -261,28 +313,40 @@ export function CitizenApp({
       {route === 'report' && (
         <section className="citizen-screen report-screen">
           <div className="screen-heading"><div><p className="eyebrow">Help your community</p><h1>Report an incident</h1></div></div>
-          <p className="muted">
-            Reports are saved in this device's durable prototype queue. They are not marked sent
-            until a server accepts them.
-          </p>
+          <p className="muted">Share a clear photo of a crack, blocked road, rockfall, seepage, or retaining-wall damage. Your report is triaged by seven AI agents and sent to the government operations queue for officer review.</p>
           <label>
             Category
             <select value={category} onChange={(e) => setCategory(e.target.value as CitizenReportCategory)}>
-              <option>Crack</option>
+              <option>Slope crack</option>
               <option>Blocked road</option>
+              <option>Rockfall or debris</option>
               <option>Water seepage</option>
+              <option>Retaining wall damage</option>
+              <option>Other</option>
             </select>
           </label>
           <label>
             Optional note
             <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Describe what you can see" />
           </label>
-          <button className="button secondary citizen-disabled" disabled>
-            Add photo · camera integration pending
+          <label className="photo-picker">
+            Photo evidence
+            <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => {
+              const file = event.target.files?.[0]
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = () => setPhoto(typeof reader.result === 'string' ? reader.result : null)
+              reader.readAsDataURL(file)
+            }} />
+          </label>
+          {photo && <img className="report-photo-preview" src={photo} alt="Selected incident evidence" />}
+          <button className="button secondary" type="button" onClick={requestLocation}>Use my location</button>
+          <p className="muted">{locationStatus}</p>
+          <button className="button" type="button" onClick={() => void submitReport()} disabled={reportStatus.kind === 'sending'}>
+            {reportStatus.kind === 'sending' ? 'Sending through agents…' : 'Submit report to government'}
           </button>
-          <button className="button" onClick={saveReport}>
-            Save report locally
-          </button>
+          <button className="button secondary" type="button" onClick={saveReport}>Save offline for later</button>
+          {reportStatus.message && <p className={reportStatus.kind === 'error' ? 'error' : 'report-result'}>{reportStatus.message}</p>}
           {queued > 0 && (
             <p className="muted">
               {queued} report{queued === 1 ? '' : 's'} safely queued on this device.

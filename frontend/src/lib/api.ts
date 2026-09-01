@@ -10,6 +10,9 @@ import type {
   CommanderChatMessage,
   CommanderChatResponse,
   SavedRoutePlan,
+  RiskForecast,
+  CitizenReportRecord,
+  CitizenReportStatus,
 } from '../types/schemas'
 import type { DdmaDecisionKind } from './ddma'
 
@@ -31,6 +34,7 @@ export const api = {
   getState: () => request<ModeState>('/api/state'),
   getScenarios: () => request<ScenarioSummary[]>('/api/scenarios'),
   getAoi: (aoiId: string) => request<AoiInfo>(`/api/aoi/${aoiId}`),
+  getRiskForecast: (locationId: string) => request<RiskForecast>(`/api/risk/forecast?location_id=${encodeURIComponent(locationId)}`),
   startReplay: (scenarioId: string) =>
     request<ModeState>('/api/replay/start', {
       method: 'POST',
@@ -85,4 +89,16 @@ export const api = {
   saveRoutePlan: (payload: { name: string; aoi_id: string; village_id: string; routes: CommanderChatResponse['routes'] }) =>
     request<SavedRoutePlan>('/api/commander/saved-routes', { method: 'POST', body: JSON.stringify(payload) }),
   listSavedRoutePlans: () => request<SavedRoutePlan[]>('/api/commander/saved-routes'),
+  submitCitizenReport: (payload: {
+    aoi_id: string
+    category: string
+    description: string
+    lat: number
+    lon: number
+    accuracy_m?: number | null
+    image_data_url: string
+  }) => request<CitizenReportRecord>('/api/citizen-reports', { method: 'POST', body: JSON.stringify(payload) }),
+  listCitizenReports: (aoiId = 'aizawl') => request<CitizenReportRecord[]>(`/api/citizen-reports?aoi_id=${encodeURIComponent(aoiId)}`),
+  updateCitizenReportStatus: (reportId: string, payload: { status: CitizenReportStatus; officer_id: string; notes?: string }) =>
+    request<CitizenReportRecord>(`/api/citizen-reports/${encodeURIComponent(reportId)}/status`, { method: 'PATCH', body: JSON.stringify(payload) }),
 }

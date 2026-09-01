@@ -18,7 +18,16 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from pathlib import Path
 
+from app.citizen_reports.store import CitizenReportStore
+from app.citizen_reports.workflow import CitizenReportWorkflow
+from app.config import (
+    NVIDIA_API_KEY,
+    NVIDIA_BASE_URL,
+    NVIDIA_TIMEOUT_SECONDS,
+    NVIDIA_VISION_MODEL,
+)
 from app.core.bus import Bus, Topic
 from app.core.clock import Clock
 from app.core.mode import ModeMachine
@@ -34,12 +43,21 @@ logger = logging.getLogger(__name__)
 
 
 class AppState:
-    def __init__(self, *, realtime: bool = True):
+    def __init__(self, *, realtime: bool = True, citizen_report_data_dir: Path | None = None):
         self.bus = Bus()
         self.mode = ModeMachine(self.bus)
         self.pipeline = Pipeline()
         self.latest_tick: TickResult | None = None
         self.commander_store = CommanderStore()
+        report_root = citizen_report_data_dir or Path(__file__).resolve().parents[2] / "data" / "citizen_reports"
+        self.citizen_report_store = CitizenReportStore(report_root)
+        self.citizen_report_workflow = CitizenReportWorkflow(
+            self.citizen_report_store,
+            api_key=NVIDIA_API_KEY,
+            model=NVIDIA_VISION_MODEL,
+            base_url=NVIDIA_BASE_URL,
+            timeout=NVIDIA_TIMEOUT_SECONDS,
+        )
         # Real Announcements this session has dispatched (Task 3/4, Foundation sub-project).
         # Independent of replay state — an announcement made in LIVE mode stays visible even if a
         # replay starts afterwards, unlike self.pipeline (which IS reassigned on start_replay()).

@@ -4,6 +4,7 @@ Every inter-module boundary in this codebase is one of these models. Change the 
 first, then the producers, then the consumers.
 """
 from app.schemas.audit import AuditEvent
+from app.schemas.citizen_report import AgentTrace, CitizenReport, CitizenReportSubmit
 from app.schemas.decision import ActionCard, EvacuationRoute
 from app.schemas.impact import (
     RoadSegmentRisk,
@@ -20,8 +21,11 @@ __all__ = [
     "ActionCard",
     "Attribution",
     "AuditEvent",
+    "AgentTrace",
     "CellObservation",
     "CellRisk",
+    "CitizenReport",
+    "CitizenReportSubmit",
     "EvacuationRoute",
     "ModeState",
     "ObservationFrame",

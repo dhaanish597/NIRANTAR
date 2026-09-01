@@ -246,6 +246,8 @@ make freeze                 # tag a known-good demo build
 
 > **Update this section every session. Keep it short and true.**
 
+- **Crowdsourced reporting:** the deferred 3.11 slice is now implemented end to end. Citizen photo reports run through a Civic Pulse-derived seven-agent workflow, persist in the SQLite fallback store, retry from the offline queue, and appear in the government Community Reports workspace for human disposition.
+
 - **Phase:** 1 done for its P0 critical path (only 1.4 lithology deliberately deferred, 1.9 InSAR
   cut-first, real IMD/SMAP live-download verification blocked on external auth). Phase 2 (impact
   layer) done. Phase 3 (decision/dissemination) done except 3.9 (TTS, not attempted) and 3.11 (P2
@@ -359,6 +361,13 @@ make freeze                 # tag a known-good demo build
 ## 12. Session Log
 
 > Newest entry at the top. One entry per session. Keep each to ~5 lines.
+
+### 2026-08-31 - Civic Pulse crowdsourced reporting slice
+
+- **Did:** Added schema-first citizen report contracts, validated image storage, SQLite persistence, deterministic fallback plus optional NVIDIA vision classification, and the seven-stage Ingestion/Classify/Dedup/Hotspot/Forecast/Urgency/Recommendation trace.
+- **Did:** Added citizen submission with photo capture, geolocation fallback, online upload and offline retry; added government Community Reports queue with evidence, trace, urgency and officer disposition.
+- **Verified:** Focused backend tests 4 passed; frontend suite 267 passed; frontend production build passed. Full backend suite: 775 passed, 12 skipped, 1 pre-existing failure in `test_no_wallclock.py` caused by a BOM in `backend/app/api/whatif.py`.
+- **Next:** Run a browser-level citizen-to-officer rehearsal against the dev servers and decide whether to move report persistence from SQLite fallback to the production database adapter.
 
 ### 2026-08-26 — Session 4 (autonomous multi-wave, controller + parallel worktree-isolated agents)
 

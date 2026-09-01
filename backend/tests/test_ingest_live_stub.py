@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pytest
+import geopandas as gpd
+from pathlib import Path
 
 from app.core.clock import LiveClock, ScenarioClock
 from app.ingest.base import DataSource
@@ -23,6 +25,15 @@ async def test_first_frame_is_immediate_and_labelled_fabricated_live():
     assert {c.cell_id for c in frame.cells} == set(STUB_CELL_IDS)
     assert all(c.source == "stub:live" for c in frame.cells)
     assert all(c.is_reconstructed is False for c in frame.cells)
+    assert "not a measured weather feed" in frame.provenance["note"]
+
+
+def test_stub_cell_ids_join_the_real_aizawl_grid():
+    cells_path = Path(__file__).resolve().parents[2] / "data" / "static" / "aizawl" / "cells.gpkg"
+    if not cells_path.is_file():
+        pytest.skip("requires built Aizawl grid")
+    real_ids = set(gpd.read_file(cells_path, columns=["cell_id"])["cell_id"])
+    assert set(STUB_CELL_IDS) <= real_ids
 
 
 async def test_rejects_a_non_live_clock():

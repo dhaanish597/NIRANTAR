@@ -41,6 +41,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import pickle
 import sys
 from pathlib import Path
@@ -128,6 +129,7 @@ def _reliable_overpass_request(data):
 
 def _configure_osmnx() -> None:
     ox.settings.http_user_agent = _OVERPASS_USER_AGENT
+    ox.settings.overpass_url = "https://overpass-api.de/api"
     ox.settings.log_console = False
     # osmnx defaults its HTTP response cache to "./cache" relative to whatever directory it's
     # invoked from — left at that default this script would scatter a `backend/cache/` (or
@@ -142,6 +144,70 @@ def _configure_osmnx() -> None:
     # redirect every internal osmnx caller in this process — see `_reliable_overpass_request`'s
     # own docstring for why this is necessary in this environment.
     ox._overpass._overpass_request = _reliable_overpass_request
+
+
+def _graph_from_osm_api_tiles(aoi: AoiConfig, *, divisions: int = 3) -> nx.MultiDiGraph:
+    """Fallback for public Overpass outages using tiled, standard OSM map exports."""
+    import time as _time
+
+    import requests as _requests
+
+    cache_dir = REPO_ROOT / "data" / "osm" / "_osm_api_cache" / aoi.id
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    min_lon, min_lat, max_lon, max_lat = aoi.bbox
+    lon_step = (max_lon - min_lon) / divisions
+    lat_step = (max_lat - min_lat) / divisions
+    graphs: list[nx.MultiDiGraph] = []
+
+    def download_tile(left: float, bottom: float, right: float, top: float, label: str, depth: int = 0) -> list[Path]:
+        path = cache_dir / f"tile-{label}.osm"
+        if path.is_file():
+            return [path]
+        response = _requests.get(
+            "https://api.openstreetmap.org/api/0.6/map",
+            params={"bbox": f"{left},{bottom},{right},{top}"},
+            headers={"User-Agent": _OVERPASS_USER_AGENT},
+            timeout=180,
+        )
+        if response.status_code == 400 and depth < 3:
+            mid_lon = (left + right) / 2.0
+            mid_lat = (bottom + top) / 2.0
+            print(f"  OSM tile {label} is dense; subdividing ...")
+            return [
+                *download_tile(left, bottom, mid_lon, mid_lat, f"{label}-0", depth + 1),
+                *download_tile(mid_lon, bottom, right, mid_lat, f"{label}-1", depth + 1),
+                *download_tile(left, mid_lat, mid_lon, top, f"{label}-2", depth + 1),
+                *download_tile(mid_lon, mid_lat, right, top, f"{label}-3", depth + 1),
+            ]
+        response.raise_for_status()
+        path.write_bytes(response.content)
+        print(f"  cached OSM map tile {label}")
+        _time.sleep(2.0)
+        return [path]
+
+    for row in range(divisions):
+        for col in range(divisions):
+            left = min_lon + col * lon_step
+            right = min_lon + (col + 1) * lon_step
+            bottom = min_lat + row * lat_step
+            top = min_lat + (row + 1) * lat_step
+            for path in download_tile(left, bottom, right, top, f"{row}-{col}"):
+                graphs.append(ox.graph_from_xml(path, simplify=False, retain_all=True))
+
+    combined = nx.compose_all(graphs)
+    excluded = {
+        "bridleway", "construction", "corridor", "cycleway", "footway", "path",
+        "pedestrian", "proposed", "raceway", "steps", "track",
+    }
+    for u, v, key, data in list(combined.edges(keys=True, data=True)):
+        values = data.get("highway", [])
+        classes = set(values if isinstance(values, list) else [values])
+        if not classes or classes <= excluded:
+            combined.remove_edge(u, v, key)
+    combined.remove_nodes_from(list(nx.isolates(combined)))
+    if combined.number_of_edges() == 0:
+        raise RuntimeError("OSM map exports contained no routable road edges")
+    return ox.simplification.simplify_graph(combined)
 
 
 def _first(value):
@@ -172,7 +238,14 @@ def build_road_graph(aoi_id: str) -> tuple[Path, Path]:
     # AoiConfig.bbox is (min_lon, min_lat, max_lon, max_lat) — exactly OSMnx 2.x's
     # `(left, bottom, right, top)` bbox convention (verified against the installed osmnx's own
     # docstring), no reordering needed.
-    raw_graph = ox.graph_from_bbox(aoi.bbox, network_type=NETWORK_TYPE, simplify=True)
+    force_osm_api = os.getenv("NIRANTAR_OSM_API_FALLBACK") == "1"
+    try:
+        if force_osm_api:
+            raise RuntimeError("OSM API fallback explicitly selected")
+        raw_graph = ox.graph_from_bbox(aoi.bbox, network_type=NETWORK_TYPE, simplify=True)
+    except Exception as exc:
+        print(f"  Overpass unavailable ({exc}); falling back to tiled OSM map exports ...")
+        raw_graph = _graph_from_osm_api_tiles(aoi)
     print(f"  {raw_graph.number_of_nodes()} nodes, {raw_graph.number_of_edges()} edges")
 
     graph = nx.MultiDiGraph()

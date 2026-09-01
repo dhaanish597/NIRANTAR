@@ -16,6 +16,8 @@ import type {
   TickResult,
   VerificationRecord,
   VillageIsolation,
+  RiskForecast,
+  RiskForecastDay,
 } from '../types/schemas'
 
 const MAX_ACTION_CARDS = 20
@@ -64,6 +66,8 @@ interface TickStoreState {
   announcements: Announcement[]
   verificationByAlertId: Record<string, VerificationRecord>
   citizenReports: CitizenReport[]
+  forecast: RiskForecast | null
+  selectedForecastDate: string | null
 
   hydrateCitizenReports: () => void
   queueCitizenReport: (input: Pick<CitizenReport, 'category' | 'note'>) => void
@@ -91,6 +95,8 @@ interface TickStoreState {
   closeScorecard: () => void
   openAuditTrail: (alertId: string) => void
   closeAuditTrail: () => void
+  setForecast: (forecast: RiskForecast | null) => void
+  selectForecastDay: (day: RiskForecastDay) => void
 }
 
 let disconnectSocket: (() => void) | null = null
@@ -116,6 +122,8 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
   announcements: [],
   verificationByAlertId: {},
   citizenReports: [],
+  forecast: null,
+  selectedForecastDate: null,
 
   hydrateCitizenReports: () => set({ citizenReports: getCitizenReports() }),
 
@@ -167,6 +175,12 @@ export const useTickStore = create<TickStoreState>((set, get) => ({
       set({ error: err instanceof Error ? err.message : String(err) })
     }
   },
+
+  setForecast: (forecast) => set({
+    forecast,
+    selectedForecastDate: forecast?.forecast[0]?.date ?? null,
+  }),
+  selectForecastDay: (day) => set({ selectedForecastDate: day.date }),
 
   startReplay: async (scenarioId: string) => {
     try {

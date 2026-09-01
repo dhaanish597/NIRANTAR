@@ -47,6 +47,12 @@ from app.config import (
 from app.schemas.impact import SettlementPriority, VillageIsolation
 
 
+# Static geometry resolution is independent of the current tick's probabilities. Cache it by
+# (repository root, AOI) so a replay does not re-read and rebuild GeoPandas spatial indexes on
+# every frame. The dynamic p_fail lookup remains per-call below.
+_STATIC_RESOLUTION_CACHE: dict[tuple[str, str], tuple[list[str], list[str], dict[str, float | None]]] = {}
+
+
 def _tier(eps: float, p1_threshold: float, p2_threshold: float) -> Literal["P1", "P2", "P3"]:
     if eps >= p1_threshold:
         return "P1"
@@ -138,6 +144,18 @@ def resolve_priority_inputs(
     if not exposure_path.is_file():
         raise FileNotFoundError(f"{exposure_path} not found — run scripts/fetch_exposure.py first")
 
+    cache_key = (str(root.resolve()), aoi_id)
+    cached = _STATIC_RESOLUTION_CACHE.get(cache_key)
+    if cached is not None:
+        village_ids, nearest_cell_ids, shelter_distance_km = cached
+        return (
+            {
+                village_id: cell_risks_by_cell_id.get(cell_id, 0.0)
+                for village_id, cell_id in zip(village_ids, nearest_cell_ids)
+            },
+            dict(shelter_distance_km),
+        )
+
     cells = gpd.read_file(cells_path)  # native CRS = the AOI's projected UTM zone (build_grid.py)
     villages = gpd.read_file(exposure_path, layer="villages")
     shelters = gpd.read_file(exposure_path, layer="shelters")
@@ -150,12 +168,14 @@ def resolve_priority_inputs(
     cell_tree = STRtree(cell_centroids.values)
     cell_ids = cells["cell_id"].tolist()
 
-    p_fail_by_village: dict[str, float] = {}
+    village_ids: list[str] = []
+    nearest_cell_ids: list[str] = []
     for _, row in villages.iterrows():
         village_id = f"v_{row.osm_id}"
         idx = cell_tree.nearest(row.geometry)
         nearest_cell_id = cell_ids[idx]
-        p_fail_by_village[village_id] = cell_risks_by_cell_id.get(nearest_cell_id, 0.0)
+        village_ids.append(village_id)
+        nearest_cell_ids.append(nearest_cell_id)
 
     shelter_distance_km: dict[str, float | None] = {}
     if shelters.empty:
@@ -176,4 +196,11 @@ def resolve_priority_inputs(
                 nearest_dist_deg = shelters.geometry.distance(row.geometry).min()
                 shelter_distance_km[village_id] = nearest_dist_deg * 111.0
 
-    return p_fail_by_village, shelter_distance_km
+    _STATIC_RESOLUTION_CACHE[cache_key] = (village_ids, nearest_cell_ids, dict(shelter_distance_km))
+    return (
+        {
+            village_id: cell_risks_by_cell_id.get(cell_id, 0.0)
+            for village_id, cell_id in zip(village_ids, nearest_cell_ids)
+        },
+        shelter_distance_km,
+    )

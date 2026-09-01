@@ -48,8 +48,10 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 import sys
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -68,12 +70,18 @@ from app.config import AoiConfig, get_aoi  # noqa: E402
 # Same Overpass identification requirement discovered in scripts/build_grid.py (task 1.2) —
 # the default requests User-Agent gets a flat 406 from this server.
 _OVERPASS_USER_AGENT = "NIRANTAR-SIH26001/0.1 (research prototype; contact 240186.cs@rmkec.ac.in)"
-_OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+_OVERPASS_URLS = (
+    "https://overpass.osm.ch/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+)
 # Courtesy delay between successive Overpass calls in one run (this script makes 4). Found by
 # actually running this script, not assumed: the public instance rate-limited us with HTTP 429
 # after just 2 calls at a 2s gap, so this is deliberately generous rather than a guess.
 _OVERPASS_CALL_DELAY_S = 15.0
 _OVERPASS_MAX_RETRIES = 5
+_OSM_API_CACHE_ROOT = REPO_ROOT / "data" / "osm" / "_osm_api_cache"
+_OSM_API_DIVISIONS = 3
 
 WORLDPOP_URL = "https://data.worldpop.org/GIS/Population_Density/Global_2000_2020_1km/2020/IND/ind_pd_2020_1km.tif"
 WORLDPOP_CACHE_DIR = REPO_ROOT / "data" / "static" / "_worldpop_tiles"
@@ -89,6 +97,8 @@ VILLAGE_BUFFER_M = 500.0
 # OSM / Overpass
 # =============================================================================================
 def _overpass_query(query: str) -> dict:
+    if os.getenv("NIRANTAR_OSM_API_FALLBACK") == "1":
+        raise RuntimeError("OSM API fallback explicitly selected")
     """POSTs to Overpass, retrying on HTTP 429 (rate limit) with backoff. The public instance
     rate-limits per-IP regardless of the inter-call delay we impose ourselves, so a single delay
     isn't sufficient on its own — confirmed by actually hitting a 429 while writing this script."""
@@ -97,8 +107,9 @@ def _overpass_query(query: str) -> dict:
     # retry rather than failing the whole run.
     retryable = {429, 502, 503, 504}
     for attempt in range(_OVERPASS_MAX_RETRIES):
+        url = _OVERPASS_URLS[attempt % len(_OVERPASS_URLS)]
         response = requests.post(
-            _OVERPASS_URL,
+            url,
             data={"data": query},
             timeout=120,
             headers={"User-Agent": _OVERPASS_USER_AGENT},
@@ -107,7 +118,7 @@ def _overpass_query(query: str) -> dict:
             retry_after = float(response.headers.get("Retry-After", 0) or 0)
             wait_s = max(retry_after, _OVERPASS_CALL_DELAY_S * (attempt + 1))
             print(
-                f"  Overpass HTTP {response.status_code}, waiting {wait_s:.0f}s before retry "
+                f"  Overpass HTTP {response.status_code} from {url}, waiting {wait_s:.0f}s before retry "
                 f"{attempt + 1}/{_OVERPASS_MAX_RETRIES} ..."
             )
             time.sleep(wait_s)
@@ -143,6 +154,112 @@ def _empty_gdf(columns: list[str]) -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame({c: [] for c in columns if c != "geometry"}, geometry=[], crs="EPSG:4326")
 
 
+def _aoi_id_for_bbox(bbox_lonlat: tuple[float, float, float, float]) -> str:
+    for aoi_id in ("aizawl", "wayanad", "tupul"):
+        if tuple(get_aoi(aoi_id).bbox) == tuple(bbox_lonlat):
+            return aoi_id
+    raise ValueError(f"bbox does not match a registered AOI: {bbox_lonlat!r}")
+
+
+def _download_osm_map_tiles(bbox_lonlat: tuple[float, float, float, float]) -> list[Path]:
+    """Download standard OSM map-export XML tiles, subdividing dense tiles.
+
+    This is a real-data fallback for public Overpass outages. Files are cached under
+    data/osm/_osm_api_cache and reused on subsequent runs and in offline replay setup.
+    """
+    aoi_id = _aoi_id_for_bbox(bbox_lonlat)
+    cache_dir = _OSM_API_CACHE_ROOT / aoi_id
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    min_lon, min_lat, max_lon, max_lat = bbox_lonlat
+    lon_step = (max_lon - min_lon) / _OSM_API_DIVISIONS
+    lat_step = (max_lat - min_lat) / _OSM_API_DIVISIONS
+
+    def download(left: float, bottom: float, right: float, top: float, label: str, depth: int = 0) -> list[Path]:
+        path = cache_dir / f"tile-{label}.osm"
+        if path.is_file() and path.stat().st_size > 0:
+            return [path]
+        response = requests.get(
+            "https://api.openstreetmap.org/api/0.6/map",
+            params={"bbox": f"{left},{bottom},{right},{top}"},
+            headers={"User-Agent": _OVERPASS_USER_AGENT},
+            timeout=180,
+        )
+        if response.status_code == 400 and depth < 3:
+            mid_lon = (left + right) / 2.0
+            mid_lat = (bottom + top) / 2.0
+            print(f"  OSM exposure tile {label} is dense; subdividing ...")
+            return [
+                *download(left, bottom, mid_lon, mid_lat, f"{label}-0", depth + 1),
+                *download(mid_lon, bottom, right, mid_lat, f"{label}-1", depth + 1),
+                *download(left, mid_lat, mid_lon, top, f"{label}-2", depth + 1),
+                *download(mid_lon, mid_lat, right, top, f"{label}-3", depth + 1),
+            ]
+        response.raise_for_status()
+        path.write_bytes(response.content)
+        print(f"  cached OSM exposure tile {label}")
+        time.sleep(2.0)
+        return [path]
+
+    paths: list[Path] = []
+    for row in range(_OSM_API_DIVISIONS):
+        for col in range(_OSM_API_DIVISIONS):
+            left = min_lon + col * lon_step
+            right = min_lon + (col + 1) * lon_step
+            bottom = min_lat + row * lat_step
+            top = min_lat + (row + 1) * lat_step
+            paths.extend(download(left, bottom, right, top, f"{row}-{col}"))
+    return paths
+
+
+def _osm_api_elements(bbox_lonlat: tuple[float, float, float, float]) -> list[dict]:
+    """Parse cached OSM map-export XML into Overpass-like element dictionaries."""
+    paths = _download_osm_map_tiles(bbox_lonlat)
+    min_lon, min_lat, max_lon, max_lat = bbox_lonlat
+    nodes: dict[int, dict] = {}
+    ways: list[dict] = []
+    for path in paths:
+        root = ET.parse(path).getroot()
+        for node in root.findall("node"):
+            node_id = int(node.attrib["id"])
+            lon = float(node.attrib["lon"])
+            lat = float(node.attrib["lat"])
+            tags = {tag.attrib["k"]: tag.attrib.get("v", "") for tag in node.findall("tag")}
+            nodes[node_id] = {"type": "node", "id": node_id, "lon": lon, "lat": lat, "tags": tags}
+        for way in root.findall("way"):
+            way_id = int(way.attrib["id"])
+            refs = [int(nd.attrib["ref"]) for nd in way.findall("nd")]
+            tags = {tag.attrib["k"]: tag.attrib.get("v", "") for tag in way.findall("tag")}
+            coords = [(nodes[r]["lon"], nodes[r]["lat"]) for r in refs if r in nodes]
+            if not coords:
+                continue
+            lon = sum(x for x, _ in coords) / len(coords)
+            lat = sum(y for _, y in coords) / len(coords)
+            ways.append({"type": "way", "id": way_id, "center": {"lon": lon, "lat": lat}, "tags": tags})
+    elements = [*nodes.values(), *ways]
+    return [
+        el for el in elements
+        if min_lon <= float(_element_point(el).x) <= max_lon
+        and min_lat <= float(_element_point(el).y) <= max_lat
+    ]
+
+
+def _fallback_elements(bbox_lonlat: tuple[float, float, float, float], kind: str, amenity_regex: str | None = None) -> list[dict]:
+    elements = _osm_api_elements(bbox_lonlat)
+    if kind == "villages":
+        return [el for el in elements if el["type"] == "node" and el.get("tags", {}).get("place") in {"village", "hamlet"}]
+    if kind == "amenity":
+        import re
+
+        pattern = re.compile(amenity_regex or ".*")
+        return [
+            el for el in elements
+            if el.get("tags", {}).get("amenity") and pattern.match(el["tags"]["amenity"])
+        ]
+    if kind == "bridges":
+        return [el for el in elements if el.get("tags", {}).get("man_made") == "bridge"]
+    raise ValueError(f"unknown OSM fallback kind: {kind}")
+
+
 def fetch_villages(bbox_lonlat: tuple[float, float, float, float]) -> gpd.GeoDataFrame:
     min_lon, min_lat, max_lon, max_lat = bbox_lonlat
     query = (
@@ -150,7 +267,11 @@ def fetch_villages(bbox_lonlat: tuple[float, float, float, float]) -> gpd.GeoDat
         f'node["place"~"^(village|hamlet)$"]({min_lat},{min_lon},{max_lat},{max_lon});'
         "out body;"
     )
-    data = _overpass_query(query)
+    try:
+        data = _overpass_query(query)
+    except Exception as exc:
+        print(f"  Overpass villages unavailable ({exc}); using cached OSM map exports ...")
+        data = {"elements": _fallback_elements(bbox_lonlat, "villages")}
     rows = []
     for el in data.get("elements", []):
         pt = _element_point(el)
@@ -180,7 +301,11 @@ def fetch_amenity(bbox_lonlat: tuple[float, float, float, float], amenity_regex:
         ");"
         "out center;"
     )
-    data = _overpass_query(query)
+    try:
+        data = _overpass_query(query)
+    except Exception as exc:
+        print(f"  Overpass amenities unavailable ({exc}); using cached OSM map exports ...")
+        data = {"elements": _fallback_elements(bbox_lonlat, "amenity", amenity_regex)}
     rows = []
     for el in data.get("elements", []):
         pt = _element_point(el)
@@ -209,7 +334,11 @@ def fetch_bridges(bbox_lonlat: tuple[float, float, float, float]) -> gpd.GeoData
         ");"
         "out center;"
     )
-    data = _overpass_query(query)
+    try:
+        data = _overpass_query(query)
+    except Exception as exc:
+        print(f"  Overpass bridges unavailable ({exc}); using cached OSM map exports ...")
+        data = {"elements": _fallback_elements(bbox_lonlat, "bridges")}
     rows = []
     for el in data.get("elements", []):
         pt = _element_point(el)

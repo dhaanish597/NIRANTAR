@@ -32,7 +32,7 @@ vi.mock('maplibre-gl', () => {
     }
     remove() {}
   }
-  return { MapLibreMap: FakeMap }
+  return { MapLibreMap: FakeMap, addProtocol: vi.fn() }
 })
 
 vi.mock('./lib/ws', () => ({ connectTickSocket: () => () => {} }))
@@ -41,6 +41,8 @@ vi.mock('./lib/api', () => ({
     getState: () => Promise.resolve({ mode: 'live', scenario_id: null, scenario_time: null, speed_factor: 1, paused: false }),
     getScenarios: () => Promise.resolve([]),
     getAoi: () => Promise.resolve({ id: 'aizawl', name: 'Aizawl', center: { lat: 0, lon: 0 } }),
+    listCitizenReports: () => Promise.resolve([]),
+    listAnnouncements: () => Promise.resolve([]),
   },
 }))
 // OnboardingOverlay is a real, required root mount (see App.tsx) — but its own copy literally
