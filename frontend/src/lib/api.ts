@@ -1,6 +1,7 @@
 import type {
   ActionCard,
   Announcement,
+  AoiExposure,
   AoiInfo,
   AuditEvent,
   ModeState,
@@ -34,6 +35,7 @@ export const api = {
   getState: () => request<ModeState>('/api/state'),
   getScenarios: () => request<ScenarioSummary[]>('/api/scenarios'),
   getAoi: (aoiId: string) => request<AoiInfo>(`/api/aoi/${aoiId}`),
+  getAoiExposure: (aoiId: string) => request<AoiExposure>(`/api/aoi/${aoiId}/exposure`),
   getRiskForecast: (locationId: string) => request<RiskForecast>(`/api/risk/forecast?location_id=${encodeURIComponent(locationId)}`),
   startReplay: (scenarioId: string) =>
     request<ModeState>('/api/replay/start', {

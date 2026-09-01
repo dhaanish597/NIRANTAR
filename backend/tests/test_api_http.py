@@ -71,6 +71,29 @@ def test_get_aoi_unknown_is_404():
     assert response.status_code == 404
 
 
+@pytest.mark.skipif(not HAS_REAL_AIZAWL_DATA, reason="requires built Aizawl static data")
+def test_get_aoi_exposure_returns_real_villages():
+    with make_client() as client:
+        response = client.get("/api/aoi/aizawl/exposure")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["aoi_id"] == "aizawl"
+    assert len(body["villages"]) > 0
+    village = body["villages"][0]
+    assert village["village_id"].startswith("v_")
+    assert -90 <= village["lat"] <= 90
+    assert -180 <= village["lon"] <= 180
+    # Same id convention impact/priority.py and impact/isolation.py already use, so a tick's
+    # SettlementPriority/VillageIsolation.village_id joins against this with no translation.
+    assert village["village_id"] == f"v_{village['village_id'][2:]}"
+
+
+def test_get_aoi_exposure_unknown_is_404():
+    with make_client() as client:
+        response = client.get("/api/aoi/does-not-exist/exposure")
+    assert response.status_code == 404
+
+
 def test_list_scenarios_includes_smoke():
     with make_client() as client:
         response = client.get("/api/scenarios")

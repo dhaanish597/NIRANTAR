@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SettlementPriority, VillageIsolation } from '../types/schemas'
+import type { SettlementPriority, VillageExposure, VillageIsolation } from '../types/schemas'
 import { stubVillagePosition, TIER_COLOR, villagesToFeatureCollection } from './villages'
 
 const aoiCenter = { lat: 23.7307, lon: 92.7173 }
@@ -84,5 +84,33 @@ describe('villagesToFeatureCollection', () => {
   it('renders an empty collection for an empty priorities list', () => {
     const fc = villagesToFeatureCollection([], [], aoiCenter)
     expect(fc.features).toHaveLength(0)
+  })
+
+  it('marks a hash-ring pin as not real when no exposure/isolation position is available', () => {
+    const fc = villagesToFeatureCollection([makePriority()], [], aoiCenter)
+    expect(fc.features[0].properties.position_is_real).toBe(false)
+  })
+
+  it('prefers a real exposure point over the synthetic hash-ring position', () => {
+    const exposure = new Map<string, VillageExposure>([
+      ['v1', { village_id: 'v1', name: 'Durtlang', lat: 23.75, lon: 92.7, population_worldpop_est: 4100, osm_population: null }],
+    ])
+    const fc = villagesToFeatureCollection([makePriority()], [], aoiCenter, exposure)
+    const [feature] = fc.features
+    expect(feature.properties.position_is_real).toBe(true)
+    expect(feature.geometry.coordinates).toEqual([92.7, 23.75])
+    // Not the synthetic ring position for the same village_id.
+    expect(feature.geometry.coordinates).not.toEqual(
+      villagesToFeatureCollection([makePriority()], [], aoiCenter).features[0].geometry.coordinates,
+    )
+  })
+
+  it('still prefers a real VillageIsolation.geometry over exposure when both are present', () => {
+    const exposure = new Map<string, VillageExposure>([
+      ['v1', { village_id: 'v1', name: 'Durtlang', lat: 23.75, lon: 92.7, population_worldpop_est: 4100, osm_population: null }],
+    ])
+    const isolation = makeIsolation({ geometry: { type: 'Point', coordinates: [92.71, 23.73] } })
+    const fc = villagesToFeatureCollection([makePriority()], [isolation], aoiCenter, exposure)
+    expect(fc.features[0].geometry.coordinates).toEqual([92.71, 23.73])
   })
 })

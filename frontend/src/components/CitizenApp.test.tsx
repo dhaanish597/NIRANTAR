@@ -42,7 +42,7 @@ vi.mock('maplibre-gl', () => {
 })
 
 vi.mock('../lib/api', () => ({
-  api: { acknowledgeVillage: vi.fn() },
+  api: { acknowledgeVillage: vi.fn(), getAoiExposure: () => Promise.resolve({ aoi_id: 'aizawl', villages: [], shelters: [] }) },
 }))
 
 const CARD: ActionCard = {

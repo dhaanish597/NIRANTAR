@@ -58,7 +58,7 @@ export function DashboardWorkspace({ onOpenReports = () => undefined }: { onOpen
   }, [aoi?.id, aoi?.name, mode, setForecast])
 
   return (
-    <>
+    <div className="dashboard-shell">
       <ForecastStrip forecast={forecast} selectedDate={selectedForecastDate} loading={forecastLoading} error={forecastError} onSelect={selectForecastDay} />
       <div className="dashboard-workspace relative flex flex-1 overflow-hidden">
         <div className="map-stage">
@@ -84,7 +84,7 @@ export function DashboardWorkspace({ onOpenReports = () => undefined }: { onOpen
       </div>
       <ReplayControlBar />
       <ScenarioPickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} />
-    </>
+    </div>
   )
 }
 

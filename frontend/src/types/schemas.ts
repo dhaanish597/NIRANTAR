@@ -158,6 +158,32 @@ export interface AoiInfo {
   note?: string
 }
 
+/** backend/app/schemas/exposure.py — real village/shelter points from `exposure.gpkg`, fetched
+ * once per AOI (GET /api/aoi/{id}/exposure) and joined client-side against per-tick
+ * SettlementPriority/VillageIsolation by `village_id`. Never fabricated positions. */
+export interface VillageExposure {
+  village_id: string
+  name: string
+  lat: number
+  lon: number
+  population_worldpop_est: number | null
+  osm_population: number | null
+}
+
+export interface ShelterExposure {
+  shelter_id: string
+  name: string
+  amenity: string | null
+  lat: number
+  lon: number
+}
+
+export interface AoiExposure {
+  aoi_id: string
+  villages: VillageExposure[]
+  shelters: ShelterExposure[]
+}
+
 /** BUILD_PLAN.md task 5.8 — POST /api/whatif/simulate's request body
  * (backend/app/api/whatif.py::WhatIfRequest). */
 export interface WhatIfRequest {

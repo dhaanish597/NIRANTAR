@@ -41,6 +41,7 @@ vi.mock('./lib/api', () => ({
     getState: () => Promise.resolve({ mode: 'live', scenario_id: null, scenario_time: null, speed_factor: 1, paused: false }),
     getScenarios: () => Promise.resolve([]),
     getAoi: () => Promise.resolve({ id: 'aizawl', name: 'Aizawl', center: { lat: 0, lon: 0 } }),
+    getAoiExposure: () => Promise.resolve({ aoi_id: 'aizawl', villages: [], shelters: [] }),
     listCitizenReports: () => Promise.resolve([]),
     listAnnouncements: () => Promise.resolve([]),
   },

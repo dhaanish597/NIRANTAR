@@ -126,9 +126,12 @@ async def main() -> int:
     forbidden = re.compile(r"https?://(?!127\.0\.0\.1|localhost)")
     hits = []
     for root in scan_paths:
-        paths = [root] if root.is_file() else list(root.rglob("*.py"))
+        if root.is_file():
+            paths = [root]
+        else:
+            paths = [p for pat in ("*.py", "*.ts", "*.tsx") for p in root.rglob(pat)]
         for path in paths:
-            for line_no, line in enumerate(path.read_text(encoding="utf-8"), 1):
+            for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
                 if forbidden.search(line):
                     hits.append(f"{path.relative_to(REPO_ROOT)}:{line_no}")
     if hits:

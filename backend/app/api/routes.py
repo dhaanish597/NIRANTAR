@@ -36,6 +36,7 @@ from app.config import get_aoi as get_aoi_config  # aliased: this module's OWN `
 from app.core.bus import Topic
 from app.core.clock import LiveClock
 from app.core.mode import ModeError
+from app.impact.exposure import load_aoi_exposure
 from app.ingest.factory import SCENARIOS_DIR, UnknownScenarioError, load_scenario_or_raise
 from app.pipeline import Pipeline
 from app.schemas.announcement import Announcement
@@ -47,6 +48,7 @@ from app.schemas.citizen_report import (
     CitizenReportSubmit,
 )
 from app.schemas.decision import ActionCard
+from app.schemas.exposure import AoiExposure
 from app.schemas.mode import ModeState, RunMode
 from app.schemas.forecast import RiskForecast
 from app.risk.forecast import build_forecast
@@ -74,6 +76,24 @@ async def get_aoi(aoi_id: str) -> dict:
         "center": {"lat": aoi.center_lat, "lon": aoi.center_lon},
         "bbox": list(aoi.bbox),
     }
+
+
+@router.get("/aoi/{aoi_id}/exposure", response_model=AoiExposure)
+async def get_aoi_exposure(aoi_id: str) -> AoiExposure:
+    """Real village/shelter points for the AOI (`data/static/<aoi>/exposure.gpkg`, task 1.3).
+
+    Deliberately a separate static endpoint from the per-tick websocket stream: exposure geometry
+    is fixed for the life of an AOI's built static data, so re-sending it every tick would be pure
+    waste on the wire. The frontend fetches it once per AOI and joins it against the live
+    `TickResult.priorities`/`TickResult.isolations` by `village_id` — see schemas/exposure.py's
+    module docstring for the shared id convention this depends on.
+    """
+    if aoi_id not in AOIS:
+        raise HTTPException(status_code=404, detail=f"unknown AOI {aoi_id!r}")
+    try:
+        return load_aoi_exposure(aoi_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/risk/forecast", response_model=RiskForecast)
