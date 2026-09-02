@@ -1,0 +1,53 @@
+/* Scoped restoration of the pre-heatmap map styling from commit ab785e5
+ * (frontend/src/components/map-workspace.css), for LegacyMapView only.
+ *
+ * Every rule here is scoped under `.legacy-map` (the class LegacyMapView adds to its
+ * `.map-canvas` root) so it overrides the current dark/gradient map-workspace.css by
+ * specificity and never leaks to the operational MapView used by the Commander workspace.
+ * Only the selectors that actually differ from the current sheet and are rendered inside
+ * LegacyMapView's subtree are repeated here; shared chrome (controls, layer menu, dashboard
+ * header, media-query geometry) is identical to the current sheet and left to it. */
+
+.map-stage:has(.legacy-map) { background: #dce8e2; }
+.map-canvas.legacy-map { background: #dce8e2; }
+
+/* ---- ab785e5 legend: light panel + 4 discrete swatches (not the heatmap gradient) ---- */
+.legacy-map .map-legend {
+  position: absolute;
+  z-index: 3;
+  right: 20px;
+  bottom: 22px;
+  display: grid;
+  gap: 8px;
+  min-width: 150px;
+  padding: 12px;
+  border: 1px solid #9db8b1;
+  border-radius: 5px;
+  background: #f7fbf7e8;
+  color: #20444a;
+  box-shadow: 0 7px 20px #12352b22;
+  font-size: 10px;
+}
+.legacy-map .map-legend-title { display: flex; justify-content: space-between; color: #153e45; font-size: 11px; font-weight: 800; }
+.legacy-map .map-legend-title span { color: #79928d; font-size: 9px; font-weight: 500; }
+.legacy-map .legend-section { display: grid; gap: 5px; padding-top: 6px; border-top: 1px solid #d7e4dd; }
+.legacy-map .legend-section strong { color: #72908a; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+.legacy-map .legend-section span { display: flex; align-items: center; gap: 7px; color: #20444a; }
+.legacy-map .legend-swatch { width: 11px; height: 7px; border-radius: 2px; }
+.legacy-map .legend-swatch.low { background: #56b88e; }
+.legacy-map .legend-swatch.moderate { background: #e4c650; }
+.legacy-map .legend-swatch.high { background: #ed9850; }
+.legacy-map .legend-swatch.critical { background: #d95353; }
+.legacy-map .legend-line { width: 18px; height: 3px; border-radius: 3px; }
+.legacy-map .legend-line.normal { background: #7caaa0; }
+.legacy-map .legend-line.hazard { background: #e59a4f; }
+.legacy-map .legend-line.blocked { height: 0; border-top: 3px dashed #d95353; }
+.legacy-map .legend-note { margin: 0; color: #7a928e; font-size: 9px; line-height: 1.35; }
+
+@media (max-width: 900px) {
+  .legacy-map .map-legend { right: 14px; bottom: 14px; }
+}
+@media (max-width: 520px) {
+  .legacy-map .map-legend { min-width: 135px; padding: 9px; }
+  .legacy-map .map-legend .legend-section:nth-of-type(2) { display: none; }
+}

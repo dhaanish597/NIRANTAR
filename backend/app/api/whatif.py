@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 import geopandas as gpd
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from app.pipeline import Pipeline
 from app.schemas.ingest import CellObservation, ObservationFrame
@@ -34,13 +34,23 @@ WHAT_IF_ASSUMPTIONS: list[str] = [
 
 
 class WhatIfRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
     aoi_id: str = "aizawl"
     rainfall_mm: float = Field(gt=0.0, le=2000.0, description="Total simulated rainfall, mm")
     duration_hours: float = Field(gt=0.0, le=240.0, description="Simulated storm duration, hours")
     antecedent_rainfall_mm: float | None = Field(default=None, ge=0.0, le=350.0)
     soil_moisture_pct: float | None = Field(default=None, ge=0.0, le=100.0)
+
+    # Accepted for API compatibility with the restored (ab785e5) What-If Simulator UI, which
+    # exposes these as scenario controls. The current pipeline-based simulation consumes only
+    # rainfall/duration/antecedent/soil-moisture; these are validated and echoed back but do not
+    # (yet) influence a server-side run. The client-side offline fallback (buildWhatIfDemo) does
+    # use them. Kept optional so existing 4-field callers are unaffected.
+    slope_modifier_deg: float | None = Field(default=None, ge=15.0, le=55.0)
+    distance_to_fault_km: float | None = Field(default=None, ge=0.1, le=15.0)
+    lithology: Literal["weak", "moderate", "competent"] | None = None
+    snow_mass_mm: float | None = Field(default=None, ge=0.0, le=150.0)
+    snow_melt_active: bool | None = None
+    exposure_weight: float | None = Field(default=None, ge=0.5, le=2.0)
 
 
 class WhatIfSummary(BaseModel):

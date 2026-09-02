@@ -11,7 +11,7 @@ import {
 import { actionCardForVillage, villagesWithActionCards } from '../lib/villageView'
 import { useTickStore } from '../store/useTickStore'
 import type { AuditEvent } from '../types/schemas'
-import { MapView } from './MapView'
+import { LegacyMapView as MapView } from './LegacyMapView'
 import { NotBuilt } from './NotBuilt'
 
 export type CitizenRoute = 'alert' | 'route' | 'announcement' | 'report'

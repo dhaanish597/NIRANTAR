@@ -190,8 +190,14 @@ export interface WhatIfRequest {
   aoi_id: string
   rainfall_mm: number
   duration_hours: number
+  slope_modifier_deg?: number
+  distance_to_fault_km?: number
+  lithology?: 'weak' | 'moderate' | 'competent'
   antecedent_rainfall_mm?: number
   soil_moisture_pct?: number
+  snow_mass_mm?: number
+  snow_melt_active?: boolean
+  exposure_weight?: number
 }
 
 export type ForecastSource = 'LIVE' | 'MODEL' | 'FALLBACK'
@@ -295,7 +301,7 @@ export interface WhatIfSummary {
 }
 
 export interface WhatIfMetadata {
-  source: 'model'
+  source: 'model' | 'demo' | 'fallback'
   mode: 'simulation'
   spatial_resolution: string
   assumptions: string[]

@@ -1,0 +1,7 @@
+/** Restored verbatim from commit ab785e5 (frontend/src/components/MapLegend.tsx) so the
+ * LegacyMapView (Dashboard + Citizen route map) keeps its original 4-swatch legend. The current
+ * MapLegend.tsx is the heatmap-era gradient legend and stays in use by the operational MapView
+ * (Commander workspace). Styling lives in legacy-map-workspace.css, scoped under `.legacy-map`. */
+export function LegacyMapLegend({ showRisk, showRoads }: { showRisk: boolean; showRoads: boolean }) {
+  return <div className="map-legend"><div className="map-legend-title">Map key <span>current view</span></div>{showRisk && <div className="legend-section"><strong>Risk overlay</strong><span><i className="legend-swatch low" />Low</span><span><i className="legend-swatch moderate" />Moderate</span><span><i className="legend-swatch high" />High</span><span><i className="legend-swatch critical" />Critical</span></div>}{showRoads && <div className="legend-section"><strong>Road hazards</strong><span><i className="legend-line normal" />Normal</span><span><i className="legend-line hazard" />High risk</span><span><i className="legend-line blocked" />Blocked</span></div>}<p className="legend-note">Overlay values from the current {showRisk ? 'risk' : 'impact'} feed.</p></div>
+}
