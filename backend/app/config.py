@@ -323,3 +323,38 @@ ACTION_CARD_CONTACT_PLACEHOLDER = (
 # figure; large enough to give estimate_safe_window's linear fit (WINDOW_MIN_TREND_POINTS=3
 # minimum) a stable-looking recent trend without holding an unbounded history.
 PIPELINE_EXCEEDANCE_HISTORY_LEN = 50
+
+
+# =================================================================================================
+# api/ratelimit.py — per-client request limits. Added for the first real deployment: until now
+# this service had only ever run on localhost, so an unthrottled endpoint cost nothing. Two
+# routes cost real money or real CPU once the service is publicly reachable:
+#   * POST /api/commander/chat   — calls a paid third-party LLM with a real API key.
+#   * POST /api/citizen-reports  — decodes an arbitrary base64 image and may make a vision call.
+# The NVIDIA key is deliberately deployed to this public backend (the user's ruling), so these
+# limits are the only thing standing between the endpoint and someone else's bill.
+# =================================================================================================
+# Master switch, so a purely local non-public run can opt out. Defaults ON — the safe direction
+# to fail: an unset environment variable in a new deployment still gets limits.
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+}
+
+# Sized for "one human clicking", deliberately far above any plausible person's use: a DDMA
+# officer demonstrating the commander in bursts, or a village submitting several photos in a
+# row, must never be throttled. A limiter that fires during the pitch would itself be a demo
+# risk, so these catch automation, not enthusiasm. (The demo path runs entirely offline and hits
+# neither endpoint — see CLAUDE.md rule 10.)
+RATE_LIMIT_COMMANDER_CHAT_MAX = 20
+RATE_LIMIT_COMMANDER_CHAT_WINDOW_SECONDS = 60.0
+
+RATE_LIMIT_CITIZEN_REPORT_MAX = 10
+RATE_LIMIT_CITIZEN_REPORT_WINDOW_SECONDS = 60.0
+
+# Upper bound on distinct client keys held in memory at once, so a spray of forged
+# X-Forwarded-For values cannot grow the limiter's dict without limit on a 512 MB free instance.
+# Least-recently-active clients are evicted first; eviction only forgives that client's history,
+# it never blocks anyone.
+RATE_LIMIT_MAX_TRACKED_CLIENTS = 2048

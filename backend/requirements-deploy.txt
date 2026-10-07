@@ -1,0 +1,51 @@
+# Runtime dependency set for the deployed service — the union of what `backend/app/` actually
+# imports at import time, and nothing else.
+#
+# Why this exists instead of reusing requirements.txt / requirements-*.txt: those files are
+# layered for DEVELOPERS, so each one pulls in the layer below it (`-r`). Installing
+# requirements-ml.txt would drag in rasterio, scipy, h5py and osmnx — none of which the running
+# service imports. On Render's free tier that is not just wasteful, it is a 512 MB memory budget
+# spent on native libraries that never get loaded.
+#
+# What was deliberately LEFT OUT, and why (verified by grepping module-level imports across
+# backend/app/, not assumed):
+#   rasterio, scipy     — not imported anywhere in app/. Both are build-time only (scripts/).
+#   h5py                — imported *inside functions* in ingest/live/{imerg,smap}.py, reached only
+#                         from those modules' own CLI entry points. The demo runs offline
+#                         (CLAUDE.md rule 10) and never calls them.
+#   osmnx               — CLAUDE.md §2: "OSMnx only in scripts/, never at runtime". The runtime
+#                         loads the pickled NetworkX graph the script already built, so it needs
+#                         networkx, not osmnx.
+#   sqlalchemy, geoalchemy2, psycopg2-binary — scripts/load_db.py only; the app's own SQLite
+#                         fallback uses the stdlib `sqlite3`.
+#   mapbox-vector-tile, pmtiles — scripts/build_tiles.py only; tiles are pre-built artifacts.
+#   python-dotenv       — function-local in the live adapters' CLIs; config.py reads os.getenv.
+#   pytest, pytest-asyncio — the deployed service does not run its own test suite.
+#
+# Version ranges are copied verbatim from the layered files so the deployed and local
+# environments cannot silently drift apart.
+
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.32,<1.0
+pydantic>=2.9,<3.0
+pydantic-settings>=2.5,<3.0
+
+# Geospatial runtime: geopandas/pandas for cells.gpkg + exposure.gpkg, shapely+pyproj for the
+# runout geometry and reprojection, requests for the live adapters' HTTP calls.
+geopandas>=1.0,<2.0
+shapely>=2.0,<3.0
+pyproj>=3.6,<4.0
+requests>=2.32,<3.0
+
+# impact/road_graph.py + impact/isolation.py: the pickled graph is plain NetworkX.
+networkx>=3.3,<4.0
+
+# risk/model.py (XGBoost inference) and risk/explain.py (SHAP attributions per cell).
+xgboost>=2.1,<3.0
+shap>=0.46,<1.0
+
+# dissemination/cap.py — CAP 1.2 XML generation.
+lxml>=5.0,<6.0
+
+# app/commander/service.py — the NVIDIA chat/vision client is httpx-based.
+httpx>=0.27,<1.0

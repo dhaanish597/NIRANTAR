@@ -21,11 +21,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.api.announcements import AnnouncementRequest, create_announcement, list_announcements
+from app.api.ratelimit import rate_limit
 from app.citizen_reports.images import decode_image_data_url
 from app.api.whatif import WhatIfRequest, WhatIfResult, simulate_whatif
 from app.audit.producers import record_ddma_decision, record_village_acknowledged
@@ -111,9 +112,25 @@ async def get_risk_forecast(request: Request, location_id: str = "aizawl") -> Ri
     return build_forecast(aoi.id, aoi.name, tick)
 
 
-@router.post("/citizen-reports", response_model=CitizenReport, status_code=201)
-async def submit_citizen_report(body: CitizenReportSubmit, request: Request) -> CitizenReport:
-    """Run a geotagged photo through the seven-stage Civic Pulse-derived workflow."""
+@router.post(
+    "/citizen-reports",
+    response_model=CitizenReport,
+    status_code=201,
+    # Declared explicitly: FastAPI does not infer a 429 from the `rate_limit` dependency, so
+    # without this a client reading the OpenAPI schema would not know the endpoint can refuse.
+    responses={429: {"description": "Rate limit exceeded — see the Retry-After header."}},
+)
+async def submit_citizen_report(
+    body: CitizenReportSubmit,
+    request: Request,
+    _limit: None = Depends(rate_limit("citizen_report")),
+) -> CitizenReport:
+    """Run a geotagged photo through the seven-stage Civic Pulse-derived workflow.
+
+    Rate-limited (see `api/ratelimit.py`): the body is an arbitrary-size base64 image that this
+    route decodes before anything else can reject it, and the workflow's classify stage may call
+    a paid vision model. It is "only" one upload for a real villager, but unbounded for a script.
+    """
     try:
         aoi = get_aoi_config(body.aoi_id)
     except KeyError as exc:

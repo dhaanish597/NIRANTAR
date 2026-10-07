@@ -1,0 +1,50 @@
+# Render Blueprint — the backend service.
+#
+# Native Python runtime, NOT the Dockerfile in backend/: that Dockerfile is Phase 0 only (it
+# installs requirements.txt, which is the fastapi/pydantic subset — the app cannot import against
+# it), and Docker is unavailable in the environment this deployment was prepared in. A native
+# Python service needs neither.
+#
+# Deploy with:  render blueprint apply   (or point Render's dashboard at this repo; it reads this
+# file automatically as a Blueprint).
+#
+# Env vars marked `sync: false` have NO value in git and must be set in the Render dashboard:
+#   NVIDIA_API_KEY  — the paid LLM key for /api/commander/chat. Guarded by app/api/ratelimit.py.
+#   ALLOWED_ORIGINS — the deployed frontend's origin. Chicken-and-egg with Vercel: deploy the
+#                     frontend first, then paste its URL here.
+# See docs/DEPLOYMENT.md for the full sequence.
+
+services:
+  - type: web
+    name: nirantar-api
+    runtime: python
+    plan: free
+    # Singapore is Render's closest region to the North East — the AOIs are Aizawl, Tupul and
+    # Wayanad, and every user of this system is in India.
+    region: singapore
+    # The app's own root: uvicorn runs `app.main:app` from here, and REPO_ROOT in risk/model.py
+    # resolves `parents[3]` off `__file__`, so it still finds `<repo>/data` correctly.
+    rootDir: backend
+    # `../scripts/fetch_deploy_data.sh` downloads the checksum-pinned artifact bundle. Render
+    # clones the whole repo even with rootDir set, so the repo-root-relative path is correct, and
+    # the script resolves its own repo root from its location rather than from $PWD.
+    buildCommand: bash ../scripts/fetch_deploy_data.sh && pip install --upgrade pip && pip install -r requirements-deploy.txt
+    # $PORT is injected by Render; hardcoding 8000 (as the Dockerfile's CMD does) would fail the
+    # port scan.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      # Turns off the any-localhost-port CORS regex (see app/main.py) — a deployed service has no
+      # reason to accept an origin of http://localhost:* from a stranger's browser.
+      - key: NIRANTAR_ENV
+        value: production
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # app/api/ratelimit.py — ON unless explicitly disabled. Set here rather than relying on the
+      # code default so the setting is visible in the dashboard next to the key it protects.
+      - key: RATE_LIMIT_ENABLED
+        value: "true"

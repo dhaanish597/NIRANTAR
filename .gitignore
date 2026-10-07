@@ -64,3 +64,8 @@ data/*.sqlite3
 # --- Vendored reference project (own git repo; source for the Civic Pulse-derived
 #     crowdsourced-reporting slice). Not part of the NIRANTAR tree. ---
 CivicPulse/
+
+# --- Locally built deployment bundle (scripts/build_deploy_bundle.sh output). A ~28 MB archive
+#     of artifacts that are gitignored anyway; it is published as a GitHub Release asset, never
+#     committed. ---
+dist-deploy/
