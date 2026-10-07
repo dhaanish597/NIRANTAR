@@ -1,0 +1,34 @@
+# What the Vercel CLI must NOT upload from this repo.
+#
+# This file lists paths to exclude rather than patterns to include. The build genuinely needs
+# `data/scenarios/*.json` and `data/models/eval_report.md` — `frontend/src/lib/scenarioDetails.ts`
+# and `evalReport.ts` pull them in with Vite's `import.meta.glob`, at build time — and the
+# `.pmtiles` basemaps are fetched by `scripts/fetch_deploy_data.sh` during the build. Everything
+# else under `data/` is hundreds of megabytes of intermediate downloads (raw Copernicus DEM tiles,
+# ESA WorldCover rasters, NASA granules, Overpass caches) that no frontend build step opens.
+#
+# Uploading them would make every deploy slow without changing the output by a byte.
+
+# Backend: a Vercel static build never reads it.
+backend/
+
+# Vendored reference project (its own git repo).
+CivicPulse/
+
+# Intermediates and heavy derived data the build does not use.
+data/static/
+data/osm/
+data/tiles/
+data/models/*
+!data/models/eval_report.md
+
+# Locally built deployment bundle and documentation.
+dist-deploy/
+docs/
+
+# Build outputs and dependency trees.
+frontend/node_modules/
+frontend/dist/
+**/__pycache__/
+**/.venv/
+**/.pytest_cache/

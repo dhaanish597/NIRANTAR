@@ -69,3 +69,4 @@ CivicPulse/
 #     of artifacts that are gitignored anyway; it is published as a GitHub Release asset, never
 #     committed. ---
 dist-deploy/
+.vercel
