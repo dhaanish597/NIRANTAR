@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as api_router
 from app.api.commander import router as commander_router
+from app.api.multiplex import router as multiplex_router
 from app.api.state import AppState
 from app.ws.hub import router as ws_router
 
@@ -69,6 +70,7 @@ def create_app(*, realtime: bool = True, citizen_report_data_dir: Path | None = 
     )
     app.include_router(api_router)
     app.include_router(commander_router)
+    app.include_router(multiplex_router)
     app.include_router(ws_router)
 
     @app.get("/healthz")

@@ -1,0 +1,36 @@
+{
+  "audio_fixtures": [
+    {
+      "id": "fix-audio-chennai-01",
+      "aoi_id": "chennai",
+      "file": "velachery_substation_spark.wav",
+      "language_code": "ta-IN",
+      "codemix_transcript": "Anna, Velachery SUB-CHENNAI-33KV-01 transformer spark aagudhu, CUL-CHENNAI-01 culvert la 1.2 meter thanni!",
+      "english_translation": "Brother, the Velachery SUB-CHENNAI-33KV-01 transformer is sparking, and there is 1.2 meters of water at culvert CUL-CHENNAI-01!",
+      "lat": 12.957,
+      "lon": 80.211,
+      "claimed_depth_m": 1.25
+    },
+    {
+      "id": "fix-audio-wayanad-01",
+      "aoi_id": "wayanad",
+      "file": "velachery_substation_spark.wav",
+      "language_code": "ml-IN",
+      "codemix_transcript": "Chooralmala BR-WAYANAD-01 bridge inte aduthu landslide undayi, SUB-WAYANAD-33KV-01 feeder line cut aayi!",
+      "english_translation": "A landslide occurred near the Chooralmala BR-WAYANAD-01 bridge, and the SUB-WAYANAD-33KV-01 feeder line is cut!",
+      "lat": 11.547,
+      "lon": 76.126,
+      "claimed_depth_m": 1.4
+    }
+  ],
+  "vision_fixtures": [
+    {
+      "id": "fix-vision-shelter-ta-01",
+      "aoi_id": "chennai",
+      "shelter_id": "SHEL-CHENNAI-01",
+      "language_code": "ta-IN",
+      "extracted_markdown": "| \u0bae\u0bc1\u0b95\u0bbe\u0bae\u0bcd \u0baa\u0bc6\u0baf\u0bb0\u0bcd (Shelter) | \u0bae\u0bca\u0ba4\u0bcd\u0ba4 \u0ba8\u0baa\u0bb0\u0bcd\u0b95\u0bb3\u0bcd (Occupancy) | \u0bae\u0bb0\u0bc1\u0ba4\u0bcd\u0ba4\u0bc1\u0bb5 \u0ba4\u0bc7\u0bb5\u0bc8 (Medical) |\n|---|---|---|\n| Velachery HSS Relief Camp (SHEL-CHENNAI-01) | 312 | 18 |",
+      "parsed_occupancy": 312
+    }
+  ]
+}

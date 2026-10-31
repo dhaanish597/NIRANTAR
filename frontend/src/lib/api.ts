@@ -16,6 +16,9 @@ import type {
   CitizenReportStatus,
 } from '../types/schemas'
 import type { DdmaDecisionKind } from './ddma'
+import type { CascadeAssetItem } from '../components/MultiplexGraphOverlay'
+import type { ChokePointItem } from '../components/ChokePointTriageCard'
+import type { AgentTraceStep } from '../components/AgentTraceInspector'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -31,11 +34,70 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
+export interface MultiplexCascadeResponse {
+  trigger_node_id: string
+  max_hops: number
+  impacted_assets: CascadeAssetItem[]
+  total_critical_human_exposure: number
+  traversal_latency_ms: number
+}
+
+export interface MultiplexChokepointsResponse {
+  aoi_id: string
+  chokepoints: ChokePointItem[]
+}
+
+export interface MultiplexCopilotResponse {
+  status: string
+  executive_sitrep: string
+  recommendations: Array<{
+    priority_rank: number
+    action_type: string
+    target_node_id: string
+    recommendation_text: string
+    survival_window_hrs: number
+    citations: Array<{ node_id: string; node_label: string; edge_path: string; confidence_score: number }>
+  }>
+  verified_subgraph_node_count: number
+  unverified_citations_blocked: number
+  agent_traces: Array<{
+    turn: number
+    agent_role: string
+    model_tier: string
+    tool_called: string
+    tool_args: Record<string, unknown>
+    latency_ms: number
+  }>
+}
+
+export interface RoboticsMissionResponse {
+  mission_id: string
+  action_type: string
+  platform_type: 'UAV_DRONE' | 'USV_SONAR'
+  aoi_id: string
+  target_node_id: string
+  target_label: string
+  knowledge_partner_tag: string
+  altitude_or_draft_m: number
+  estimated_sortie_minutes: number
+  waypoints_geojson: { type: string; features: unknown[] }
+}
+
+export interface RoboticsSdgResponse {
+  aoi_id: string
+  trigger_node_id: string
+  sdg6_potable_water_person_hours_saved: number
+  sdg11_isolated_residents_reconnected: number
+  sdg13_cascade_lead_time_gain_minutes: number
+  summary_narrative: string
+}
+
 export const api = {
   getState: () => request<ModeState>('/api/state'),
   getScenarios: () => request<ScenarioSummary[]>('/api/scenarios'),
   getAoi: (aoiId: string) => request<AoiInfo>(`/api/aoi/${aoiId}`),
   getAoiExposure: (aoiId: string) => request<AoiExposure>(`/api/aoi/${aoiId}/exposure`),
+  getAoiGrid: (aoiId: string) => request<{ aoi_id: string; cell_count: number; cells: Array<{ cell_id: string; lat: number; lon: number }> }>(`/api/aoi/${encodeURIComponent(aoiId)}/grid`),
   getRiskForecast: (locationId: string) => request<RiskForecast>(`/api/risk/forecast?location_id=${encodeURIComponent(locationId)}`),
   startReplay: (scenarioId: string) =>
     request<ModeState>('/api/replay/start', {
@@ -43,8 +105,6 @@ export const api = {
       body: JSON.stringify({ scenario_id: scenarioId }),
     }),
   stopReplay: () => request<ModeState>('/api/replay/stop', { method: 'POST' }),
-  // BUILD_PLAN.md task 3.7: DDMA Console Approve/Modify/Reject -> POST /api/ddma/decide
-  // (backend/app/api/routes.py), calling the real, tested `audit/producers.py::record_ddma_decision`.
   submitDdmaDecision: (payload: {
     action_card: ActionCard
     officer_id: string
@@ -55,25 +115,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  // BUILD_PLAN.md task 3.10: Village View "I have evacuated" -> POST /api/village/acknowledge,
-  // calling the real, tested `audit/producers.py::record_village_acknowledged`.
   acknowledgeVillage: (payload: { alert_id: string; village_id: string }) =>
     request<AuditEvent>('/api/village/acknowledge', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  // BUILD_PLAN.md task 3.8: the Audit Trail view's real data source.
   getAuditTrail: (alertId: string) =>
     request<AuditEvent[]>(`/api/audit/${encodeURIComponent(alertId)}`),
-  // BUILD_PLAN.md task 5.8: the what-if rainfall simulator — a real TickResult from a throwaway
-  // backend Pipeline run (never the live one), DDMA pre-positioning support, not a real alert.
   runWhatIf: (payload: WhatIfRequest) =>
     request<WhatIfResult>('/api/whatif/simulate', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  // Sub-project 1 (Foundation): the real dissemination trigger — approves (if not already),
-  // sends through every real simulated channel, records a real DISSEMINATED audit event.
   sendAnnouncement: (payload: {
     action_card: ActionCard
     officer_id: string
@@ -103,4 +156,28 @@ export const api = {
   listCitizenReports: (aoiId = 'aizawl') => request<CitizenReportRecord[]>(`/api/citizen-reports?aoi_id=${encodeURIComponent(aoiId)}`),
   updateCitizenReportStatus: (reportId: string, payload: { status: CitizenReportStatus; officer_id: string; notes?: string }) =>
     request<CitizenReportRecord>(`/api/citizen-reports/${encodeURIComponent(reportId)}/status`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  getMultiplexCascade: (triggerNodeId: string, maxHops = 3) =>
+    request<MultiplexCascadeResponse>('/api/multiplex/cascade', {
+      method: 'POST',
+      body: JSON.stringify({ trigger_node_id: triggerNodeId, max_hops: maxHops }),
+    }),
+  getMultiplexChokepoints: (aoiId: string, topK = 3) =>
+    request<MultiplexChokepointsResponse>(`/api/multiplex/chokepoints/${encodeURIComponent(aoiId)}?top_k=${topK}`),
+  runMultiplexCopilot: (payload: { aoi_id: string; query: string; trigger_node_id?: string }) =>
+    request<MultiplexCopilotResponse>('/api/multiplex/copilot', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  deployRoboticsMission: (payload: { aoi_id: string; target_node_id: string; platform_type: 'UAV_DRONE' | 'USV_SONAR' }) =>
+    request<RoboticsMissionResponse>('/api/multiplex/robotics/mission', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getRoboticsSdg: (payload: { aoi_id: string; trigger_node_id: string; mitigated_node_ids?: string[] }) =>
+    request<RoboticsSdgResponse>('/api/multiplex/robotics/sdg', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 }
+
+export type { AgentTraceStep }

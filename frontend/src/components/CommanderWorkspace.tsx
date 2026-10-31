@@ -8,6 +8,9 @@ import type {
   CommanderStructuredResponse,
 } from '../types/schemas'
 import { CommanderResponse } from './CommanderResponse'
+import { MultiplexGraphOverlay } from './MultiplexGraphOverlay'
+import { ChokePointTriageCard } from './ChokePointTriageCard'
+import { AgentTraceInspector } from './AgentTraceInspector'
 import './commander-workspace.css'
 
 const SUGGESTIONS = [
@@ -115,6 +118,9 @@ export function CommanderWorkspace({ onAnnounce, onWhatIf }: { onAnnounce: () =>
       <div className="commander-section-label"><div><span className="eyebrow">{mode === 'replay' ? 'RECONSTRUCTED SITUATION' : 'LIVE STUB SITUATION'}</span><h2>Current operational picture</h2></div><span className="updated">Data time: {latestTick?.t ? new Date(latestTick.t).toLocaleTimeString() : 'Awaiting feed'} · Source: {latestTick?.is_reconstructed ? 'reconstructed' : 'local stub'}</span></div>
       <div className="commander-kpis">{kpis.map((kpi) => <article key={kpi.label}><span className="kpi-icon">+</span><strong>{kpi.value}</strong><span>{kpi.label}</span><small>{kpi.note}</small></article>)}</div>
     </section>
+    <MultiplexGraphOverlay aoiId={aoi?.id ?? 'chennai'} />
+    <ChokePointTriageCard aoiId={aoi?.id ?? 'chennai'} />
+    <AgentTraceInspector />
     <main className="commander-chat">
       <div className="commander-chat-heading"><div><span className="eyebrow teal">COMMANDER CONVERSATION</span><h2>What do you need to know?</h2></div><span className="source-badge">{responseSource === 'nvidia' ? 'OPTIONAL NVIDIA RESPONSE' : responseSource === 'fallback' ? 'DETERMINISTIC LOCAL' : 'LOCAL DATA CONTEXT'}</span></div>
       {messages.length === 0 && <div className="commander-welcome"><div className="commander-avatar">N</div><div><strong>Commander is ready.</strong><p>I will translate your question into an operational view using current project data. The system proposes; an authorised officer decides.</p></div></div>}

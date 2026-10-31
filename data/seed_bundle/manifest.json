@@ -1,0 +1,35 @@
+{
+  "aoi_ids": [
+    "chennai",
+    "wayanad",
+    "aizawl"
+  ],
+  "total_nodes": 324,
+  "total_edges": 351,
+  "node_counts": {
+    "MicroWatershed": 12,
+    "DrainageNode": 12,
+    "FloodZone": 12,
+    "RoadJunction": 108,
+    "RoadSegment": 147,
+    "Bridge": 3,
+    "Culvert": 3,
+    "Substation": 6,
+    "WaterFacility": 3,
+    "TelecomTower": 3,
+    "Hospital": 6,
+    "ReliefShelter": 6,
+    "SupplyDepot": 3
+  },
+  "edge_counts": {
+    "DRAINS_INTO": 12,
+    "INUNDATES": 6,
+    "CONNECTS_TO": 294,
+    "CARRIES_CORRIDOR": 6,
+    "POWERS": 15,
+    "SUPPLIES_WATER_TO": 6,
+    "COVERS_COMMS": 6,
+    "EVACUATES_TO": 6
+  },
+  "bundle_size_mb": 0.2654
+}
